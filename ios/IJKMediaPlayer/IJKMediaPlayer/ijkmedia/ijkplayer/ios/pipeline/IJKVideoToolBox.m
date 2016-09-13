@@ -335,6 +335,8 @@ void VTDecoderCallback(void *decompressionOutputRefCon,
         VideoToolBoxContext *ctx = (VideoToolBoxContext*)decompressionOutputRefCon;
         if (!ctx)
             return;
+        if (!sourceFrameRefCon)
+            return;
 
         FFPlayer   *ffp         = ctx->ffp;
         VideoState *is          = ffp->is;
