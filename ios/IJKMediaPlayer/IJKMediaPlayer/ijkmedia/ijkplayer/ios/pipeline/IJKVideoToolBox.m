@@ -36,8 +36,10 @@
 #import "IJKDeviceModel.h"
 
 #define IJK_VTB_FCC_AVCC   SDL_FOURCC('C', 'c', 'v', 'a')
+#define IJK_VTB_SAMPLE_INFO_MAGIC SDL_FOURCC('i', 'v', 's', 'm')
 
 typedef struct sample_info {
+    int     magic_code;
     int     sample_id;
 
     double  sort;
@@ -348,7 +350,10 @@ void VTDecoderCallback(void *decompressionOutputRefCon,
             ALOGE("decode callback %d %s\n", (int)status, vtb_get_error_string(status));
             goto failed;
         }
-
+        if (sample_info->magic_code != IJK_VTB_SAMPLE_INFO_MAGIC) {
+            ALOGE("decode callback wild sample info");
+            return;
+        }
         if (!sample_info->is_decoding) {
             ALOGD("VTB: frame out of date: id=%d\n", sample_info->sample_id);
             goto failed;
@@ -570,6 +575,8 @@ VTDecompressionSessionRef vtbsession_create(VideoToolBoxContext* context)
     CFRelease(destinationPixelBufferAttributes);
 
     memset(context->sample_info_array, 0, sizeof(context->sample_info_array));
+    for (int i = 0; i < VTB_MAX_DECODING_SAMPLES; i++)
+        context->sample_info_array[i].magic_code = IJK_VTB_SAMPLE_INFO_MAGIC;
     context->sample_infos_in_decoding = 0;
     return vt_session;
 }
@@ -612,6 +619,8 @@ static int decode_video_internal(VideoToolBoxContext* context, AVCodecContext *a
         sample_info_flush(context, 1000);
         vtbsession_destroy(context);
         memset(context->sample_info_array, 0, sizeof(context->sample_info_array));
+        for (int i = 0; i < VTB_MAX_DECODING_SAMPLES; i++)
+            context->sample_info_array[i].magic_code = IJK_VTB_SAMPLE_INFO_MAGIC;
         context->sample_infos_in_decoding = 0;
 
         context->vt_session = vtbsession_create(context);
@@ -826,6 +835,8 @@ static int decode_video(VideoToolBoxContext* context, AVCodecContext *avctx, AVP
         sample_info_flush(context, 1000);
         vtbsession_destroy(context);
         memset(context->sample_info_array, 0, sizeof(context->sample_info_array));
+        for (int i = 0; i < VTB_MAX_DECODING_SAMPLES; i++)
+            context->sample_info_array[i].magic_code = IJK_VTB_SAMPLE_INFO_MAGIC;
         context->sample_infos_in_decoding = 0;
 
         context->vt_session = vtbsession_create(context);
