@@ -343,6 +343,12 @@ void VTDecoderCallback(void *decompressionOutputRefCon,
         sort_queue *newFrame    = NULL;
 
         sample_info *sample_info = sourceFrameRefCon;
+
+        if (status != 0) {
+            ALOGE("decode callback %d %s\n", (int)status, vtb_get_error_string(status));
+            goto failed;
+        }
+
         if (!sample_info->is_decoding) {
             ALOGD("VTB: frame out of date: id=%d\n", sample_info->sample_id);
             goto failed;
@@ -371,11 +377,6 @@ void VTDecoderCallback(void *decompressionOutputRefCon,
 
         if (ctx->dealloced || is->abort_request || is->viddec.queue->abort_request)
             goto failed;
-
-        if (status != 0) {
-            ALOGE("decode callback %d %s\n", (int)status, vtb_get_error_string(status));
-            goto failed;
-        }
 
         if (ctx->refresh_session) {
             goto failed;
