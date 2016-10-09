@@ -87,7 +87,7 @@ struct VideoToolBoxContext {
 
     SDL_mutex                  *sample_info_mutex;
     SDL_cond                   *sample_info_cond;
-    sample_info                 sample_info_array[VTB_MAX_DECODING_SAMPLES];
+    sample_info                *sample_info_array;
     volatile int                sample_info_index;
     volatile int                sample_info_id_generator;
     volatile int                sample_infos_in_decoding;
@@ -97,6 +97,21 @@ struct VideoToolBoxContext {
 
 static void vtbformat_destroy(VTBFormatDesc *fmt_desc);
 static int  vtbformat_init(VTBFormatDesc *fmt_desc, AVCodecParameters *codecpar);
+
+static sample_info * sample_info_create() {
+    static sample_info *s_sample_info_pool = NULL;
+    if (s_sample_info_pool) {
+        free(s_sample_info_pool);
+        s_sample_info_pool = NULL;
+    }
+    s_sample_info_pool = (sample_info *)mallocz(sizeof(sample_info) * VTB_MAX_DECODING_SAMPLES);
+    return s_sample_info_pool;
+}
+
+static void sample_info_reset(sample_info *sample_info_array) {
+    assert(sample_info_array);
+    memset(sample_info_array, 0, sizeof(sample_info) * VTB_MAX_DECODING_SAMPLES);
+}
 
 static const char *vtb_get_error_string(OSStatus status) {
     switch (status) {
@@ -565,8 +580,8 @@ VTDecompressionSessionRef vtbsession_create(VideoToolBoxContext* context)
         ALOGI("%s - failed with status = (%d)", __FUNCTION__, (int)status);
     }
     CFRelease(destinationPixelBufferAttributes);
-
-    memset(context->sample_info_array, 0, sizeof(context->sample_info_array));
+    if (vt_session)
+        context->sample_info_array = sample_info_create();
     context->sample_infos_in_decoding = 0;
     return vt_session;
 }
@@ -608,7 +623,7 @@ static int decode_video_internal(VideoToolBoxContext* context, AVCodecContext *a
 
         sample_info_flush(context, 1000);
         vtbsession_destroy(context);
-        memset(context->sample_info_array, 0, sizeof(context->sample_info_array));
+        sample_info_reset(context->sample_info_array);
         context->sample_infos_in_decoding = 0;
 
         context->vt_session = vtbsession_create(context);
@@ -822,7 +837,7 @@ static int decode_video(VideoToolBoxContext* context, AVCodecContext *avctx, AVP
 
         sample_info_flush(context, 1000);
         vtbsession_destroy(context);
-        memset(context->sample_info_array, 0, sizeof(context->sample_info_array));
+        sample_info_reset(context->sample_info_array);
         context->sample_infos_in_decoding = 0;
 
         context->vt_session = vtbsession_create(context);
