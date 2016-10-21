@@ -33,9 +33,78 @@
 #import <CoreFoundation/CoreFoundation.h>
 #import <CoreVideo/CVHostTime.h>
 #import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
 #import "IJKDeviceModel.h"
 
 #define IJK_VTB_FCC_AVCC   SDL_FOURCC('C', 'c', 'v', 'a')
+
+static VideoToolBoxContext *s_latest_videotoolbox_context = NULL;
+static void (^reportBlock)(NSException *);
+
+static void videotoolbox_log(const char * format, ...)
+{
+    @autoreleasepool {
+        static dispatch_once_t onceToken;
+        static NSString *s_log_path = NULL;
+        dispatch_once(&onceToken, ^{
+            NSFileManager *filemgr = [NSFileManager defaultManager];
+            NSString *cacheFolder;
+
+            if (!cacheFolder) {
+                NSString *cacheDir = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES)[0];
+                cacheFolder = [cacheDir stringByAppendingPathComponent:@".ijk/vtb"];
+            }
+
+            NSError *error = nil;
+            if(![filemgr createDirectoryAtPath:cacheFolder withIntermediateDirectories:YES attributes:nil error:&error]) {
+                cacheFolder = nil;
+            }
+            s_log_path = [cacheFolder stringByAppendingPathComponent:@"log"];
+            [filemgr removeItemAtPath:s_log_path error:NULL];
+        });
+
+        va_list ap;
+        va_start(ap, format);
+
+        NSFileHandle* fh = [NSFileHandle fileHandleForWritingAtPath:s_log_path];
+        if ( !fh ) {
+            [[NSFileManager defaultManager] createFileAtPath:s_log_path contents:nil attributes:nil];
+            fh = [NSFileHandle fileHandleForWritingAtPath:s_log_path];
+        }
+        @try {
+            [fh seekToEndOfFile];
+            if (fh.offsetInFile > 5 * 1024 * 1024)
+                [fh truncateFileAtOffset:0];
+            [fh writeData:[[[NSString alloc] initWithFormat:[[NSString alloc] initWithUTF8String:format] arguments:ap] dataUsingEncoding:NSUTF8StringEncoding]];
+        }
+        @catch (NSException *exception) {
+        }
+        @finally {
+            [fh closeFile];
+        }
+    }
+}
+
+static void videotoolbox_log_report()
+{
+    @autoreleasepool {
+        videotoolbox_log("videotoobox_error application state=%d bgtimeremain=%d\n",[[UIApplication sharedApplication] applicationState], [[UIApplication sharedApplication] backgroundTimeRemaining]);
+        NSFileManager *filemgr = [NSFileManager defaultManager];
+        NSString *cacheDir = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES)[0];
+        cacheDir = [cacheDir stringByAppendingPathComponent:@".ijk/vtb/log"];
+        if ([filemgr fileExistsAtPath:cacheDir]) {
+            NSString *log = [[NSString alloc] initWithContentsOfFile:cacheDir encoding:NSUTF8StringEncoding error:nil];
+            if (log && reportBlock) {
+                reportBlock([NSException exceptionWithName:@"ijkvideotoolbox exception" reason:log userInfo:nil]);
+            }
+        }
+    }
+}
+
+void ijk_videotoolbox_set_exception_callback(void (^block)(NSException *))
+{
+    reportBlock = [block copy];
+}
 
 typedef struct sample_info {
     int     sample_id;
@@ -333,8 +402,26 @@ void VTDecoderCallback(void *decompressionOutputRefCon,
 {
     @autoreleasepool {
         VideoToolBoxContext *ctx = (VideoToolBoxContext*)decompressionOutputRefCon;
+        bool sampleValid = false;
         if (!ctx)
             return;
+
+        if (ctx != s_latest_videotoolbox_context) {
+            videotoolbox_log("videotoolbox_decoder callback not current vtb error sampleinfo=%p ctx=%p status=%d infoFlags=%d pts=%f ptd=%f Line:%d\n", sourceFrameRefCon, ctx, status, infoFlags, CMTimeGetSeconds(presentationTimeStamp), CMTimeGetSeconds(presentationDuration), __LINE__);
+            videotoolbox_log_report();
+            return;
+        }
+        for (int i = 0; i < VTB_MAX_DECODING_SAMPLES; i++) {
+            if (sourceFrameRefCon == &ctx->sample_info_array[i]) {
+                sampleValid = true;
+                break;
+            }
+        }
+        if (!sampleValid) {
+            videotoolbox_log("videotoolbox_decoder callback invalid sampleinfo error sampleinfo=%p ctx=%p status=%d infoFlags=%d pts=%f ptd=%f Line:%d\n", sourceFrameRefCon, ctx, status, infoFlags, CMTimeGetSeconds(presentationTimeStamp), CMTimeGetSeconds(presentationDuration), __LINE__);
+            videotoolbox_log_report();
+            return;
+        }
 
         FFPlayer   *ffp         = ctx->ffp;
         VideoState *is          = ffp->is;
@@ -612,6 +699,7 @@ static int decode_video_internal(VideoToolBoxContext* context, AVCodecContext *a
         context->sample_infos_in_decoding = 0;
 
         context->vt_session = vtbsession_create(context);
+        videotoolbox_log("videotoolbox_decoder refresh success=%d Line:%d\n", context->vt_session != NULL,__LINE__);
         if (!context->vt_session)
             goto failed;
         context->refresh_request = false;
@@ -824,6 +912,8 @@ static int decode_video(VideoToolBoxContext* context, AVCodecContext *avctx, AVP
         context->sample_infos_in_decoding = 0;
 
         context->vt_session = vtbsession_create(context);
+        videotoolbox_log("videotoolbox_session refresh success=%d Line:%d\n", context->vt_session != NULL,__LINE__);
+
         if (!context->vt_session)
             return -1;
 
@@ -916,6 +1006,7 @@ static CMFormatDescriptionRef CreateFormatDescriptionFromCodecData(Uint32 format
 
 void videotoolbox_free(VideoToolBoxContext* context)
 {
+    videotoolbox_log("videotoolbox_free start Line:%d\n", __LINE__);
     context->dealloced = true;
 
     while (context && context->m_queue_depth > 0) {
@@ -934,6 +1025,8 @@ void videotoolbox_free(VideoToolBoxContext* context)
     vtbformat_destroy(&context->fmt_desc);
 
     avcodec_parameters_free(&context->codecpar);
+    videotoolbox_log("videotoolbox_free end Line:%d\n", __LINE__);
+    s_latest_videotoolbox_context = NULL;
 }
 
 int videotoolbox_decode_frame(VideoToolBoxContext* context)
@@ -1148,6 +1241,7 @@ VideoToolBoxContext* videotoolbox_create(FFPlayer* ffp, AVCodecContext* avctx)
     assert(context_vtb->fmt_desc.fmt_desc);
 
     context_vtb->vt_session = vtbsession_create(context_vtb);
+    videotoolbox_log("videotoolbox_create success=%d Line:%d\n", context_vtb->vt_session != NULL, __LINE__);
     if (context_vtb->vt_session == NULL)
         goto fail;
 
@@ -1155,6 +1249,7 @@ VideoToolBoxContext* videotoolbox_create(FFPlayer* ffp, AVCodecContext* avctx)
     context_vtb->m_queue_depth = 0;
 
     SDL_SpeedSamplerReset(&context_vtb->sampler);
+    s_latest_videotoolbox_context = context_vtb;
     return context_vtb;
 
 fail:
