@@ -346,6 +346,17 @@ void VTDecoderCallback(void *decompressionOutputRefCon,
         sort_queue *newFrame    = NULL;
 
         sample_info *sample_info = sourceFrameRefCon;
+        BOOL sampleValid = false;
+        for (int i = 0; i < VTB_MAX_DECODING_SAMPLES; i++) {
+            if (sourceFrameRefCon == &ctx->sample_info_array[i]) {
+                sampleValid = true;
+                break;
+            }
+        }
+        if (!sampleValid) {
+            ALOGE("VTB: sample_info error: ptr=%p\n", sample_info);
+            goto failed;
+        }
         if (!sample_info->is_decoding) {
             ALOGD("VTB: frame out of date: id=%d\n", sample_info->sample_id);
             goto failed;
