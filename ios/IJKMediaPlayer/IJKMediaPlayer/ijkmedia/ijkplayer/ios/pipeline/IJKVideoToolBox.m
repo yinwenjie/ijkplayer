@@ -350,7 +350,7 @@ void VTDecoderCallback(void *decompressionOutputRefCon,
         }
         if (!sampleValid) {
             ALOGE("VTB: sample_info error: ptr=%p\n", sample_info);
-            goto failed;
+            return;
         }
         if (!sample_info->is_decoding) {
             ALOGD("VTB: frame out of date: id=%d\n", sample_info->sample_id);
