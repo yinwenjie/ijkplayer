@@ -717,6 +717,7 @@ public class IjkMediaPlayerService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
+        mLibBundle = intent.getExtras();
         return mBinder;
     }
 
