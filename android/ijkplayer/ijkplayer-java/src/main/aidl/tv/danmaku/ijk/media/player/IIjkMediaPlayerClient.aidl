@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2013-2014 Bilibili
- * Copyright (C) 2013-2014 Zhang Rui <bbcallen@gmail.com>
+ * Copyright (C) 2006 Bilibili
+ * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (C) 2016 Raymond Zheng <raymondzheng1412@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +18,8 @@
 
 package tv.danmaku.ijk.media.player;
 
-import java.io.File;
-
-public interface IjkLibLoader {
-    void loadLibrary(String libName) throws UnsatisfiedLinkError,
-            SecurityException;
-
-    File findLibrary(String libName);
+interface IIjkMediaPlayerClient {
+    String onMediaCodecSelect(String mimeType, int profile, int level);
+    boolean onNativeInvoke(int what, inout Bundle args);
+    void onEventHandler(int what, int arg1, int arg2);
 }

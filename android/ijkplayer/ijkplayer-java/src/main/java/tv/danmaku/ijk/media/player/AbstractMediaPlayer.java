@@ -21,6 +21,8 @@ import tv.danmaku.ijk.media.player.misc.IMediaDataSource;
 
 @SuppressWarnings("WeakerAccess")
 public abstract class AbstractMediaPlayer implements IMediaPlayer {
+    public static final int MSG_ERROR_SERVICE_DISCONNECTED = 10001;
+
     private OnPreparedListener mOnPreparedListener;
     private OnCompletionListener mOnCompletionListener;
     private OnBufferingUpdateListener mOnBufferingUpdateListener;

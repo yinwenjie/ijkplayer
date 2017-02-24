@@ -4,4 +4,15 @@
     <uses-sdk
         android:minSdkVersion="9" />
 
+    <application>
+        <service
+            android:name="tv.danmaku.ijk.media.player.services.IjkMediaPlayerService"
+            android:enabled="true"
+            android:exported="false"
+            android:process=":ijkservice" />
+    </application>
+
 </manifest>
+
+
+
