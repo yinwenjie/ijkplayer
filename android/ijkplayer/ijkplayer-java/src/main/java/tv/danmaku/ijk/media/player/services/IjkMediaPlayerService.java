@@ -708,6 +708,13 @@ public class IjkMediaPlayerService extends Service {
                 switch (what) {
                     default:
                         Log.e(TAG, "ANR happened, IjkMediaPlayerService will reboot");
+                        if (mClient != null) {
+                            try {
+                                mClient.onReportAnr(what);
+                            } catch (RemoteException e) {
+                                e.printStackTrace();
+                            }
+                        }
                         System.exit(0);
                         break;
                 }
@@ -735,9 +742,8 @@ public class IjkMediaPlayerService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        mProtectHandle.removeCallbacksAndMessages(null);
         mHandlerThread.quit();
-        mHandlerThread = null;
-        mProtectHandle = null;
         mClient = null;
         if (mIsLibLoaded) {
             _release();

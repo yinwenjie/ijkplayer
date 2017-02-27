@@ -202,6 +202,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     private HandlerThread mHandleThread;
     private SomeWorkHandler mSomeWorkHandle;
     private ArrayList<Message> mWaitList;
+    private boolean mHappenAnr = false;
 
     private static class SomeWorkHandler extends Handler {
         private final WeakReference<IjkMediaPlayer> mWeakPlayer;
@@ -604,6 +605,13 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                 player.mEventHandler.sendMessage(m);
             }
         }
+
+        @Override
+        public void onReportAnr(int what) {
+            DebugLog.w(TAG, "IjkMediaPlayerService happen anr in what =" + what);
+            mHappenAnr = true;
+        }
+
     }
 
     private class IjkMediaPlayerServiceConnection implements ServiceConnection {
@@ -638,9 +646,6 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
             DebugLog.w(TAG, "IjkMediaPlayer onServiceDisconnected\n");
             mServiceIsConnected = false;
             IjkMediaPlayer player = mWeakPlayer.get();
-            if (player != null) {
-                player.mSomeWorkHandle.obtainMessage(SERVICE_DISCONNECTED).sendToTarget();
-            }
             if (mOnServiceIsConnectedListener != null)
                 mOnServiceIsConnectedListener.onServiceIsConnected(mServiceIsConnected);
             mIjkplayerService = null;
@@ -754,7 +759,13 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
     private void onBuglyReport(Exception e) {
         if (CrashModule.hasInitialized()) {
-            CrashReport.postCatchedException(new ServiceException("Call Service Api Fail", e.getCause()));
+            if (mHappenAnr) {
+                CrashReport.postCatchedException(new ServiceException("Service ANR", e.getCause()));
+            } else {
+                CrashReport.postCatchedException(new ServiceException("Call Service Api Fail", e.getCause()));
+            }
+
+            mHappenAnr = false;
         }
     }
 
@@ -1300,6 +1311,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         mServiceIsConnected = false;
         resetListeners();
 
+        mSomeWorkHandle.removeCallbacksAndMessages(null);
         mHandleThread.quit();
         try {
             mHandleThread.join();
@@ -1308,7 +1320,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         }
 
         mWaitList.clear();
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mIjkplayerService != null) {
             try {
                 mIjkplayerService.release();
                 mIjkplayerService.unregisterClient();
