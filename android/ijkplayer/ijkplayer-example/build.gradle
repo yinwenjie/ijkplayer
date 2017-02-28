@@ -16,6 +16,9 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode rootProject.ext.versionCode
         versionName rootProject.ext.versionName
+        ndk {
+            abiFilters "armeabi-v7a", "x86", "armeabi"
+        }
     }
     buildTypes {
         release {

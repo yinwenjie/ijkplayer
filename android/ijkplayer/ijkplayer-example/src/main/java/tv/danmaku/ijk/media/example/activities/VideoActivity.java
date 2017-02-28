@@ -134,8 +134,8 @@ public class VideoActivity extends AppCompatActivity implements TracksFragment.I
         mDrawerLayout.setScrimColor(Color.TRANSPARENT);
 
         // init player
-        IjkMediaPlayer.loadLibrariesOnce(null);
-        IjkMediaPlayer.native_profileBegin("libijkplayer.so");
+        // IjkMediaPlayer.loadLibrariesOnce(null);
+        // IjkMediaPlayer.native_profileBegin("libijkplayer.so");
 
         mVideoView = (IjkVideoView) findViewById(R.id.video_view);
         mVideoView.setMediaController(mMediaController);
@@ -171,7 +171,7 @@ public class VideoActivity extends AppCompatActivity implements TracksFragment.I
         } else {
             mVideoView.enterBackground();
         }
-        IjkMediaPlayer.native_profileEnd();
+        // IjkMediaPlayer.native_profileEnd();
     }
 
     @Override
