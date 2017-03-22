@@ -59,4 +59,6 @@ interface IIjkMediaPlayer {
     void nativeProfileBegin(String libName);
     void nativeProfileEnd();
     void nativeSetLogLevel(int level);
+    void setAndroidIOCallback();
+    long getAndroidIOTrafficStatistic();
 }

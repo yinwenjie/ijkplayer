@@ -154,32 +154,33 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
     //----------------------------------------
     // some work case
-    private static final int DO_PREPAREASYNC        = 1;
-    private static final int DO_START               = 2;
-    private static final int DO_RELEASE             = 3;
-    private static final int DO_PAUSE               = 4;
-    private static final int DO_RESET               = 5;
-    private static final int DO_STOP                = 6;
-    private static final int DO_SETSURFACE          = 7;
-    private static final int DO_SETDATASOURCE       = 8;
-    private static final int DO_SETDATASOURCEBASE64 = 9;
-    private static final int DO_SETDATASOURCEKEY    = 10;
-    private static final int DO_SETDATASOURCEFD     = 11;
-    private static final int DO_SETSTREAMSELECTED   = 12;
-    private static final int DO_SEEKTO              = 13;
-    private static final int DO_SETLOOPCOUNT        = 14;
-    private static final int DO_SETPROPERTYFLOAT    = 15;
-    private static final int DO_SETPROPERTYLONG     = 16;
-    private static final int DO_SETVOLUME           = 17;
-    private static final int DO_SETOPTIONSTRING     = 18;
-    private static final int DO_SETOPTIONLONG       = 19;
-    private static final int DO_NATIVEFINALIZE      = 20;
-    private static final int DO_NATIVEPROFILEBEGIN  = 21;
-    private static final int DO_NATIVEPROFILEEND    = 22;
-    private static final int DO_NATIVESETLOGLEVEL   = 23;
-    private static final int DO_MSG_SAVE            = 24;
-    private static final int SERVICE_CONNECTED      = 25;
-    private static final int SERVICE_DISCONNECTED   = 26;
+    private static final int DO_PREPAREASYNC         = 1;
+    private static final int DO_START                = 2;
+    private static final int DO_RELEASE              = 3;
+    private static final int DO_PAUSE                = 4;
+    private static final int DO_RESET                = 5;
+    private static final int DO_STOP                 = 6;
+    private static final int DO_SETSURFACE           = 7;
+    private static final int DO_SETDATASOURCE        = 8;
+    private static final int DO_SETDATASOURCEBASE64  = 9;
+    private static final int DO_SETDATASOURCEKEY     = 10;
+    private static final int DO_SETDATASOURCEFD      = 11;
+    private static final int DO_SETSTREAMSELECTED    = 12;
+    private static final int DO_SEEKTO               = 13;
+    private static final int DO_SETLOOPCOUNT         = 14;
+    private static final int DO_SETPROPERTYFLOAT     = 15;
+    private static final int DO_SETPROPERTYLONG      = 16;
+    private static final int DO_SETVOLUME            = 17;
+    private static final int DO_SETOPTIONSTRING      = 18;
+    private static final int DO_SETOPTIONLONG        = 19;
+    private static final int DO_NATIVEFINALIZE       = 20;
+    private static final int DO_NATIVEPROFILEBEGIN   = 21;
+    private static final int DO_NATIVEPROFILEEND     = 22;
+    private static final int DO_NATIVESETLOGLEVEL    = 23;
+    private static final int DO_MSG_SAVE             = 24;
+    private static final int SERVICE_CONNECTED       = 25;
+    private static final int SERVICE_DISCONNECTED    = 26;
+    private static final int DO_SETANDROIDIOCALLBACK = 27;
 
     private SurfaceHolder mSurfaceHolder;
     private PowerManager.WakeLock mWakeLock = null;
@@ -438,6 +439,15 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     }
                     break;
                 case SERVICE_DISCONNECTED:
+                    break;
+                case DO_SETANDROIDIOCALLBACK:
+                    try {
+                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
+                            player.mIjkplayerService.setAndroidIOCallback();
+                        }
+                    } catch (RemoteException e) {
+                        player.onBuglyReport(e);
+                    }
                     break;
                 default:
                     DebugLog.e(TAG, "SomeWorkHandler Unknown message type " + msg.what);
@@ -843,6 +853,13 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         }
     }
 
+    public void setAndroidIOCallback() {
+        if (mIjkplayerService != null && mServiceIsConnected) {
+            mSomeWorkHandle.obtainMessage(DO_SETANDROIDIOCALLBACK).sendToTarget();
+        } else {
+            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_SETANDROIDIOCALLBACK)).sendToTarget();
+        }
+    }
     /**
      * Sets the data source as a content Uri.
      *
@@ -1522,6 +1539,17 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         if (mIjkplayerService != null && mServiceIsConnected) {
             try {
                 return mIjkplayerService.getPropertyLong(FFP_PROP_INT64_ASYNC_STATISTIC_BUF_CAPACITY, 0);
+            } catch (RemoteException e) {
+                onBuglyReport(e);
+            }
+        }
+        return 0;
+    }
+
+    public long getAndroidIOTrafficStatistic() {
+        if (mIjkplayerService != null && mServiceIsConnected) {
+            try {
+                return mIjkplayerService.getAndroidIOTrafficStatistic();
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }

@@ -43,8 +43,9 @@ import tv.danmaku.ijk.media.player.annotations.AccessedByNative;
 import tv.danmaku.ijk.media.player.annotations.CalledByNative;
 import tv.danmaku.ijk.media.player.ffmpeg.FFmpegApi;
 import tv.danmaku.ijk.media.player.misc.IMediaDataSource;
+import tv.danmaku.ijk.media.player.misc.SystemHttp;
 import tv.danmaku.ijk.media.player.pragma.DebugLog;
-import tv.danmaku.ijk.media.player.misc.IIjkIOHttp;
+import tv.danmaku.ijk.media.player.misc.IAndroidIO;
 
 public class IjkMediaPlayerService extends Service {
     private static final String TAG = "IjkMediaPlayerService";
@@ -53,41 +54,43 @@ public class IjkMediaPlayerService extends Service {
     private HandlerThread mHandlerThread = null;
     private Handler mProtectHandle = null;
     private Bundle mLibBundle;
-    private static final int MSG_NATIVE_PROTECT_CREATE              = 1;
-    private static final int MSG_NATIVE_PROTECT_START               = 2;
-    private static final int MSG_NATIVE_PROTECT_PAUSE               = 3;
-    private static final int MSG_NATIVE_PROTECT_STOP                = 4;
-    private static final int MSG_NATIVE_PROTECT_RELEASE             = 5;
-    private static final int MSG_NATIVE_PROTECT_RESET               = 6;
-    private static final int MSG_NATIVE_PROTECT_SETSURFACE          = 7;
-    private static final int MSG_NATIVE_PROTECT_SETDATASOURCE       = 8;
-    private static final int MSG_NATIVE_PROTECT_SETDATASOURCEBASE64 = 9;
-    private static final int MSG_NATIVE_PROTECT_SETDATASOURCEKEY    = 10;
-    private static final int MSG_NATIVE_PROTECT_SETDATASOURCEFD     = 11;
-    private static final int MSG_NATIVE_PROTECT_PREPAREASYNC        = 12;
-    private static final int MSG_NATIVE_PROTECT_SETSTREAMSELECTED   = 13;
-    private static final int MSG_NATIVE_PROTECT_ISPLAYING           = 14;
-    private static final int MSG_NATIVE_PROTECT_SEEKTO              = 15;
-    private static final int MSG_NATIVE_PROTECT_GETCURRENTPOSITION  = 16;
-    private static final int MSG_NATIVE_PROTECT_GETDURATION         = 17;
-    private static final int MSG_NATIVE_PROTECT_SETLOOPCOUNT        = 18;
-    private static final int MSG_NATIVE_PROTECT_GETLOOPCOUNT        = 19;
-    private static final int MSG_NATIVE_PROTECT_GETPROPERTYFLOAT    = 20;
-    private static final int MSG_NATIVE_PROTECT_SETPROPERTYFLOAT    = 21;
-    private static final int MSG_NATIVE_PROTECT_GETPROPERTYLOOG     = 22;
-    private static final int MSG_NATIVE_PROTECT_SETPROPERTYLOOG     = 23;
-    private static final int MSG_NATIVE_PROTECT_SETVOLUME           = 24;
-    private static final int MSG_NATIVE_PROTECT_GETAUDIOSESSIONID   = 25;
-    private static final int MSG_NATIVE_PROTECT_GETVIDEOCODECINFO   = 26;
-    private static final int MSG_NATIVE_PROTECT_GETADUIOCODECINFO   = 27;
-    private static final int MSG_NATIVE_PROTECT_SETOPTIONSTRING     = 28;
-    private static final int MSG_NATIVE_PROTECT_SETOPTIONLONG       = 29;
-    private static final int MSG_NATIVE_PROTECT_GETMEDIAMETA        = 30;
-    private static final int MSG_NATIVE_PROTECT_NATIVEFINALIZE      = 31;
-    private static final int MSG_NATIVE_PROTECT_GETCOLORFORMATNAME  = 32;
-    private static final int MSG_NATIVE_PROTECT_NATIVEPROFILEBEGIN  = 33;
-    private static final int MSG_NATIVE_PROTECT_NATIVEPROFILEEND    = 34;
-    private static final int MSG_NATIVE_PROTECT_NATIVESETLOGLEVEL   = 35;
+    private SystemHttp mSystemHttp;
+    private static final int MSG_NATIVE_PROTECT_CREATE               = 1;
+    private static final int MSG_NATIVE_PROTECT_START                = 2;
+    private static final int MSG_NATIVE_PROTECT_PAUSE                = 3;
+    private static final int MSG_NATIVE_PROTECT_STOP                 = 4;
+    private static final int MSG_NATIVE_PROTECT_RELEASE              = 5;
+    private static final int MSG_NATIVE_PROTECT_RESET                = 6;
+    private static final int MSG_NATIVE_PROTECT_SETSURFACE           = 7;
+    private static final int MSG_NATIVE_PROTECT_SETDATASOURCE        = 8;
+    private static final int MSG_NATIVE_PROTECT_SETDATASOURCEBASE64  = 9;
+    private static final int MSG_NATIVE_PROTECT_SETDATASOURCEKEY     = 10;
+    private static final int MSG_NATIVE_PROTECT_SETDATASOURCEFD      = 11;
+    private static final int MSG_NATIVE_PROTECT_PREPAREASYNC         = 12;
+    private static final int MSG_NATIVE_PROTECT_SETSTREAMSELECTED    = 13;
+    private static final int MSG_NATIVE_PROTECT_ISPLAYING            = 14;
+    private static final int MSG_NATIVE_PROTECT_SEEKTO               = 15;
+    private static final int MSG_NATIVE_PROTECT_GETCURRENTPOSITION   = 16;
+    private static final int MSG_NATIVE_PROTECT_GETDURATION          = 17;
+    private static final int MSG_NATIVE_PROTECT_SETLOOPCOUNT         = 18;
+    private static final int MSG_NATIVE_PROTECT_GETLOOPCOUNT         = 19;
+    private static final int MSG_NATIVE_PROTECT_GETPROPERTYFLOAT     = 20;
+    private static final int MSG_NATIVE_PROTECT_SETPROPERTYFLOAT     = 21;
+    private static final int MSG_NATIVE_PROTECT_GETPROPERTYLOOG      = 22;
+    private static final int MSG_NATIVE_PROTECT_SETPROPERTYLOOG      = 23;
+    private static final int MSG_NATIVE_PROTECT_SETVOLUME            = 24;
+    private static final int MSG_NATIVE_PROTECT_GETAUDIOSESSIONID    = 25;
+    private static final int MSG_NATIVE_PROTECT_GETVIDEOCODECINFO    = 26;
+    private static final int MSG_NATIVE_PROTECT_GETADUIOCODECINFO    = 27;
+    private static final int MSG_NATIVE_PROTECT_SETOPTIONSTRING      = 28;
+    private static final int MSG_NATIVE_PROTECT_SETOPTIONLONG        = 29;
+    private static final int MSG_NATIVE_PROTECT_GETMEDIAMETA         = 30;
+    private static final int MSG_NATIVE_PROTECT_NATIVEFINALIZE       = 31;
+    private static final int MSG_NATIVE_PROTECT_GETCOLORFORMATNAME   = 32;
+    private static final int MSG_NATIVE_PROTECT_NATIVEPROFILEBEGIN   = 33;
+    private static final int MSG_NATIVE_PROTECT_NATIVEPROFILEEND     = 34;
+    private static final int MSG_NATIVE_PROTECT_NATIVESETLOGLEVEL    = 35;
+    private static final int MSG_NATIVE_PROTECT_SETANDROIDIOCALLBACK = 36;
 
 
 
@@ -105,7 +108,7 @@ public class IjkMediaPlayerService extends Service {
     private int mListenerContext;
 
     @AccessedByNative
-    private long mNativeIjkIOHttp;
+    private long mNativeAndroidIO;
 
     private static native void _native_init();
 
@@ -130,7 +133,7 @@ public class IjkMediaPlayerService extends Service {
     private native void _setDataSource(IMediaDataSource mediaDataSource)
             throws IllegalArgumentException, SecurityException, IllegalStateException;
 
-    private native void _setDataSourceIjkIOHttp(IIjkIOHttp ijkIOHttp)
+    private native void _setAndroidIOCallback(IAndroidIO androidIO)
             throws IllegalArgumentException, SecurityException, IllegalStateException;
 
     public native void _prepareAsync() throws IllegalStateException;
@@ -213,6 +216,19 @@ public class IjkMediaPlayerService extends Service {
         }
         return false;
     }
+
+    public class SystemApplication {
+        public void notifyNativeInvoke(int what, Bundle args) {
+            if (mClient != null) {
+                try {
+                    mClient.onNativeInvoke(what, args);
+                } catch (RemoteException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
 
     @CalledByNative
     private static String onSelectCodec(Object weakThiz, String mimeType, int profile, int level) {
@@ -413,6 +429,9 @@ public class IjkMediaPlayerService extends Service {
         @Override
         public void release() {
             mProtectHandle.sendEmptyMessageDelayed(MSG_NATIVE_PROTECT_RELEASE, PROTECT_DELAY);
+            if (mSystemHttp != null) {
+                mSystemHttp.abort();
+            }
             _release();
             mProtectHandle.removeMessages(MSG_NATIVE_PROTECT_RELEASE);
         }
@@ -429,6 +448,31 @@ public class IjkMediaPlayerService extends Service {
             mProtectHandle.sendEmptyMessageDelayed(MSG_NATIVE_PROTECT_SETSURFACE, PROTECT_DELAY);
             _setVideoSurface(surface);
             mProtectHandle.removeMessages(MSG_NATIVE_PROTECT_SETSURFACE);
+        }
+
+        @Override
+        public long getAndroidIOTrafficStatistic() {
+            if (mSystemHttp != null) {
+                return mSystemHttp.getAndroidIOTrafficStatistic();
+            }
+            return 0;
+        }
+
+        @Override
+        public void setAndroidIOCallback() {
+            mProtectHandle.sendEmptyMessageDelayed(MSG_NATIVE_PROTECT_SETANDROIDIOCALLBACK, PROTECT_DELAY);
+            try {
+                mSystemHttp = new SystemHttp();
+                mSystemHttp.injectCallback(new SystemApplication());
+                _setAndroidIOCallback(mSystemHttp);
+            } catch (IllegalArgumentException ex) {
+                ex.printStackTrace();
+            } catch (SecurityException ex) {
+                ex.printStackTrace();
+            } catch (IllegalStateException ex) {
+                ex.printStackTrace();
+            }
+            mProtectHandle.removeMessages(MSG_NATIVE_PROTECT_SETANDROIDIOCALLBACK);
         }
 
         @Override
@@ -501,11 +545,6 @@ public class IjkMediaPlayerService extends Service {
             }
             mProtectHandle.removeMessages(MSG_NATIVE_PROTECT_SETDATASOURCEFD);
         }
-        
-        // public void setDataSourceIjkIOHttp(IIjkIOHttp ijkIOHttp)
-        //     throws IllegalArgumentException, SecurityException, IllegalStateException {
-        //     _setDataSourceIjkIOHttp(ijkIOHttp);
-        // }
 
         @Override
         public void prepareAsync() {
