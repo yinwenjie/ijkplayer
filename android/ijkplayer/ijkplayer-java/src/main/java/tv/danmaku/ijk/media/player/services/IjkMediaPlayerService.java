@@ -174,7 +174,8 @@ public class IjkMediaPlayerService extends Service {
 
     public native int _getAudioSessionId();
 
-    private native String _getVideoCodecInfo();
+    private native String _getVideoCodecInfo()
+            throws IllegalArgumentException;
 
     private native String _getAudioCodecInfo();
 
@@ -662,7 +663,12 @@ public class IjkMediaPlayerService extends Service {
         @Override
         public String getVideoCodecInfo() {
             mProtectHandle.sendEmptyMessageDelayed(MSG_NATIVE_PROTECT_GETVIDEOCODECINFO, PROTECT_DELAY);
-            String ret = _getVideoCodecInfo();
+            String ret = null;
+            try {
+                ret = _getVideoCodecInfo();
+            } catch (IllegalStateException e) {
+                e.printStackTrace();
+            }
             mProtectHandle.removeMessages(MSG_NATIVE_PROTECT_GETVIDEOCODECINFO);
             return ret;
         }
