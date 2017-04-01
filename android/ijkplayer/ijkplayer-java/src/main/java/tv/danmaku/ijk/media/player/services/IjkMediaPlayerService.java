@@ -333,13 +333,16 @@ public class IjkMediaPlayerService extends Service {
         synchronized (IjkMediaPlayerService.class) {
             if (!mIsLibLoaded) {
                 if (bundle != null && bundle.get("ijkffmpeg") != null &&
-                        bundle.get("ijksdl") != null && bundle.get("ijkffmpeg") != null) {
+                        bundle.get("ijksdl") != null && bundle.get("ijksoundtouch") != null &&
+                        bundle.get("ijkffmpeg") != null) {
                     System.load(bundle.get("ijkffmpeg").toString());
                     System.load(bundle.get("ijksdl").toString());
+                    System.load(bundle.get("ijksoundtouch").toString());
                     System.load(bundle.get("ijkplayer").toString());
                 } else {
                     sLocalLibLoader.loadLibrary("ijkffmpeg");
                     sLocalLibLoader.loadLibrary("ijksdl");
+                    sLocalLibLoader.loadLibrary("ijksoundtouch");
                     sLocalLibLoader.loadLibrary("ijkplayer");
                 }
                 mIsLibLoaded = true;
