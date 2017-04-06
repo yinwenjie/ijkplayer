@@ -181,6 +181,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     private static final int SERVICE_CONNECTED       = 25;
     private static final int SERVICE_DISCONNECTED    = 26;
     private static final int DO_SETANDROIDIOCALLBACK = 27;
+    private static final int NOTIFY_ONNATIVEINVOKE   = 28;
 
     private SurfaceHolder mSurfaceHolder;
     private PowerManager.WakeLock mWakeLock = null;
@@ -449,6 +450,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                         player.onBuglyReport(e);
                     }
                     break;
+                case NOTIFY_ONNATIVEINVOKE:
+                    player.mOnNativeInvokeListener.onNativeInvoke(msg.arg1, (Bundle)msg.obj);
+                    break;
                 default:
                     DebugLog.e(TAG, "SomeWorkHandler Unknown message type " + msg.what);
                     break;
@@ -570,8 +574,20 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
         @Override
         public boolean onNativeInvoke(int what, Bundle args) {
-            if (mOnNativeInvokeListener != null && mOnNativeInvokeListener.onNativeInvoke(what, args))
-                return true;
+            if (mOnNativeInvokeListener != null) {
+                switch (what) {
+                    case OnNativeInvokeListener.EVENT_WILL_HTTP_OPEN:
+                    case OnNativeInvokeListener.EVENT_WILL_HTTP_SEEK:
+                    case OnNativeInvokeListener.EVENT_DID_HTTP_SEEK:
+                    case OnNativeInvokeListener.EVENT_DID_HTTP_OPEN:
+                        mSomeWorkHandle.obtainMessage(NOTIFY_ONNATIVEINVOKE, what, 0, args).sendToTarget();
+                        return true;
+                    default: {
+                        if (mOnNativeInvokeListener.onNativeInvoke(what, args))
+                            return true;
+                    }
+                }
+            }
 
             IjkMediaPlayer player = mWeakPlayer.get();
             if (player == null) {
