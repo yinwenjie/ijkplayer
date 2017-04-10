@@ -726,10 +726,6 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         if (file != null && file.exists()) {
             bundle.putString("ijksdl", file.getAbsolutePath());
         }
-        file = libLoader.findLibrary("ijksoundtouch");
-        if (file != null && file.exists()) {
-            bundle.putString("ijksoundtouch", file.getAbsolutePath());
-        }
         file = libLoader.findLibrary("ijkplayer");
         if (file != null && file.exists()) {
             bundle.putString("ijkplayer", file.getAbsolutePath());
