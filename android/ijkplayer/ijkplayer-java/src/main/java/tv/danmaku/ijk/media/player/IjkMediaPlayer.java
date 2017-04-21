@@ -118,6 +118,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     public static final int PROP_FLOAT_VIDEO_DECODE_FRAMES_PER_SECOND       = 10001;
     public static final int PROP_FLOAT_VIDEO_OUTPUT_FRAMES_PER_SECOND       = 10002;
     public static final int FFP_PROP_FLOAT_PLAYBACK_RATE                    = 10003;
+    public static final int FFP_PROP_FLOAT_DROP_FRAME_RATE                  = 10007;
 
     public static final int FFP_PROP_INT64_SELECTED_VIDEO_STREAM            = 20001;
     public static final int FFP_PROP_INT64_SELECTED_AUDIO_STREAM            = 20002;
@@ -1654,6 +1655,17 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         if (mIjkplayerService != null && mServiceIsConnected) {
             try {
                 return mIjkplayerService.getPropertyLong(FFP_PROP_INT64_LATEST_SEEK_LOAD_DURATION, 0);
+            } catch (RemoteException e) {
+                onBuglyReport(e);
+            }
+        }
+        return 0;
+    }
+
+    public float getDropFrameRate() {
+        if (mIjkplayerService != null && mServiceIsConnected) {
+            try {
+                return mIjkplayerService.getPropertyFloat(FFP_PROP_FLOAT_DROP_FRAME_RATE, 0.0f);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
