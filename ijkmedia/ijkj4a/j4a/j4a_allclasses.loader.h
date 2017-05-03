@@ -10,3 +10,4 @@
     J4A_LOAD_CLASS(tv_danmaku_ijk_media_player_misc_IMediaDataSource);
     J4A_LOAD_CLASS(tv_danmaku_ijk_media_player_misc_IAndroidIO);
     J4A_LOAD_CLASS(tv_danmaku_ijk_media_player_services_IjkMediaPlayerService);
+    J4A_LOAD_CLASS(tv_danmaku_android_log_BLog);

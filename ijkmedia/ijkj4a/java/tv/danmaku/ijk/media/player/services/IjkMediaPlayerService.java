@@ -4,7 +4,7 @@ import android.os.Bundle;
 
 @SimpleCClassName
 public class IjkMediaPlayerService {
-    private long mNativeMediaPlayer;
+    private long mNativeMediaPlayerService;
     private long mNativeMediaDataSource;
     private long mNativeAndroidIO;
 

@@ -9,4 +9,5 @@
 #include "j4a/class/android/os/Bundle.h"
 #include "j4a/class/tv/danmaku/ijk/media/player/misc/IMediaDataSource.h"
 #include "j4a/class/tv/danmaku/ijk/media/player/misc/IAndroidIO.h"
-#include "j4a/class/tv/danmaku/ijk/media/player/IjkMediaPlayer.h"
+#include "j4a/class/tv/danmaku/ijk/media/player/services/IjkMediaPlayerService.h"
+#include "j4a/class/tv/danmaku/android/log/BLog.h"
