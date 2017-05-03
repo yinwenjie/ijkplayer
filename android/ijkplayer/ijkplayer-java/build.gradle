@@ -11,7 +11,7 @@ android {
         abortOnError false
     }
     defaultConfig {
-        minSdkVersion 9
+        minSdkVersion 15
         targetSdkVersion rootProject.ext.targetSdkVersion
     }
     buildTypes {
@@ -27,6 +27,9 @@ dependencies {
     compile "com.tencent.bugly:crashreport:2.3.1"
     compile "com.tencent.bugly:nativecrashreport:3.0"
     compile 'com.squareup.okhttp3:okhttp:3.4.0'
+    compile("com.bilibili.lib:blog:2.6.5"){
+        exclude group: "com.android.support", module: "support-v4"
+    }
 }
 
 apply from: new File(rootProject.projectDir, "tools/gradle-on-demand.gradle");
