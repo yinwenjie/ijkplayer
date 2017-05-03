@@ -97,7 +97,7 @@ public class IjkMediaPlayerService extends Service {
     private static final int PROTECT_DELAY = 3 * 1000;
 
     @AccessedByNative
-    private long mNativeMediaPlayer;
+    private long mNativeMediaPlayerService;
     @AccessedByNative
     private long mNativeMediaDataSource;
 
@@ -301,7 +301,7 @@ public class IjkMediaPlayerService extends Service {
         @Override
         public void handleMessage(Message msg) {
             IjkMediaPlayerService player = mWeakPlayer.get();
-            if (player == null || player.mNativeMediaPlayer == 0) {
+            if (player == null || player.mNativeMediaPlayerService == 0) {
                 DebugLog.w(TAG,
                         "IjkMediaPlayerService went away with unhandled events");
                 return;
