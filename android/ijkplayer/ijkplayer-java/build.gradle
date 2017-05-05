@@ -27,7 +27,7 @@ dependencies {
     compile "com.tencent.bugly:crashreport:2.3.1"
     compile "com.tencent.bugly:nativecrashreport:3.0"
     compile 'com.squareup.okhttp3:okhttp:3.4.0'
-    compile("com.bilibili.lib:blog:2.6.5"){
+    compile("com.bilibili.lib:blog:2.6.7"){
         exclude group: "com.android.support", module: "support-v4"
     }
 }
