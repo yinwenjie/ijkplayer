@@ -34,7 +34,7 @@ interface IIjkMediaPlayer {
     void setDataSource(String path);
     void setDataSourceBase64(String path);
     void setDataSourceKey(String path, in String[] keys, in String[] values);
-    void setDataSourceFd(int fd);
+    void setDataSourceFd(in ParcelFileDescriptor fd);
     void prepareAsync();
     void setStreamSelected(int stream, boolean select);
     boolean isPlaying();

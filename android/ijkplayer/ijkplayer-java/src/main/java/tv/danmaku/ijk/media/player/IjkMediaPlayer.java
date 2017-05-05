@@ -312,7 +312,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                 case DO_SETDATASOURCEFD:
                     try {
                         if (player.mIjkplayerService != null && player.mServiceIsConnected) {
-                            player.mIjkplayerService.setDataSourceFd(msg.arg1);
+                            player.mIjkplayerService.setDataSourceFd((ParcelFileDescriptor) msg.obj);
                         }
                     } catch (RemoteException e) {
                         player.onBuglyReport(e);
@@ -1018,30 +1018,11 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     @TargetApi(Build.VERSION_CODES.HONEYCOMB_MR2)
     @Override
     public void setDataSource(FileDescriptor fd) throws IOException {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB_MR1) {
-            int native_fd = -1;
-            try {
-                Field f = fd.getClass().getDeclaredField("descriptor"); //NoSuchFieldException
-                f.setAccessible(true);
-                native_fd = f.getInt(fd); //IllegalAccessException
-            } catch (NoSuchFieldException e) {
-                throw new RuntimeException(e);
-            } catch (IllegalAccessException e) {
-                throw new RuntimeException(e);
-            }
-
-            if (mIjkplayerService != null && mServiceIsConnected) {
-                mSomeWorkHandle.obtainMessage(DO_SETDATASOURCEFD, native_fd, 0).sendToTarget();
-            } else {
-                mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_SETDATASOURCEFD, native_fd, 0)).sendToTarget();
-            }
+        ParcelFileDescriptor pfd = ParcelFileDescriptor.dup(fd);
+        if (mIjkplayerService != null && mServiceIsConnected) {
+            mSomeWorkHandle.obtainMessage(DO_SETDATASOURCEFD, pfd).sendToTarget();
         } else {
-            ParcelFileDescriptor pfd = ParcelFileDescriptor.dup(fd);
-            if (mIjkplayerService != null && mServiceIsConnected) {
-                mSomeWorkHandle.obtainMessage(DO_SETDATASOURCEFD, pfd.getFd(), 0).sendToTarget();
-            } else {
-                mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_SETDATASOURCEFD, pfd.getFd(), 0)).sendToTarget();
-            }
+            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_SETDATASOURCEFD, pfd)).sendToTarget();
         }
     }
 

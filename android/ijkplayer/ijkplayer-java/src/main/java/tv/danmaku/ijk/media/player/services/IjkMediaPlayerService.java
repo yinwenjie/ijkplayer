@@ -27,6 +27,7 @@ import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
+import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
 import android.util.Log;
 import android.view.Surface;
@@ -531,10 +532,10 @@ public class IjkMediaPlayerService extends Service {
         }
 
         @Override
-        public void setDataSourceFd(int fd) {
+        public void setDataSourceFd(ParcelFileDescriptor fd) {
             mProtectHandle.sendEmptyMessageDelayed(MSG_NATIVE_PROTECT_SETDATASOURCEFD, PROTECT_DELAY);
             try {
-                _setDataSourceFd(fd);
+                _setDataSourceFd(fd.getFd());
             } catch (IOException ex) {
                 ex.printStackTrace();
             } catch (IllegalArgumentException ex) {
