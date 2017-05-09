@@ -452,7 +452,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     }
                     break;
                 case NOTIFY_ONNATIVEINVOKE:
-                    player.mOnNativeInvokeListener.onNativeInvoke(msg.arg1, (Bundle)msg.obj);
+                    if (player.mOnNativeInvokeListener != null) {
+                        player.mOnNativeInvokeListener.onNativeInvoke(msg.arg1, (Bundle)msg.obj);
+                    }
                     break;
                 default:
                     DebugLog.e(TAG, "SomeWorkHandler Unknown message type " + msg.what);
@@ -575,18 +577,16 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
         @Override
         public boolean onNativeInvoke(int what, Bundle args) {
-            if (mOnNativeInvokeListener != null) {
-                switch (what) {
-                    case OnNativeInvokeListener.EVENT_WILL_HTTP_OPEN:
-                    case OnNativeInvokeListener.EVENT_WILL_HTTP_SEEK:
-                    case OnNativeInvokeListener.EVENT_DID_HTTP_SEEK:
-                    case OnNativeInvokeListener.EVENT_DID_HTTP_OPEN:
-                        mSomeWorkHandle.obtainMessage(NOTIFY_ONNATIVEINVOKE, what, 0, args).sendToTarget();
+            switch (what) {
+                case OnNativeInvokeListener.EVENT_WILL_HTTP_OPEN:
+                case OnNativeInvokeListener.EVENT_WILL_HTTP_SEEK:
+                case OnNativeInvokeListener.EVENT_DID_HTTP_SEEK:
+                case OnNativeInvokeListener.EVENT_DID_HTTP_OPEN:
+                    mSomeWorkHandle.obtainMessage(NOTIFY_ONNATIVEINVOKE, what, 0, args).sendToTarget();
+                    return true;
+                default: {
+                    if (mOnNativeInvokeListener != null && mOnNativeInvokeListener.onNativeInvoke(what, args))
                         return true;
-                    default: {
-                        if (mOnNativeInvokeListener.onNativeInvoke(what, args))
-                            return true;
-                    }
                 }
             }
 
