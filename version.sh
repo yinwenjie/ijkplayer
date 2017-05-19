@@ -3,7 +3,7 @@
 set -e
 
 VERSION_CODE=800000
-VERSION_NAME=0.8.0
+VERSION_NAME=0.8.0-service
 VERSION_TARGET=$1
 
 do_version_readme() {
