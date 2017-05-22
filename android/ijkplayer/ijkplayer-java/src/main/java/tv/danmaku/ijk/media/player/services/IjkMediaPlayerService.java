@@ -36,6 +36,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 
+import tv.danmaku.android.log.BLog;
 import tv.danmaku.ijk.media.player.IIjkMediaPlayer;
 import tv.danmaku.ijk.media.player.IIjkMediaPlayerClient;
 import tv.danmaku.ijk.media.player.IjkLibLoader;
@@ -205,7 +206,13 @@ public class IjkMediaPlayerService extends Service {
         IjkMediaPlayerService playerService = weakPlayer.get();
         if (playerService == null)
             throw new IllegalStateException("<null weakPlayer>.onNativeInvoke()");
-        return playerService.onNativeInvokeForClient(what, args);
+        int index = args.getInt("segment_index");
+        boolean ret = playerService.onNativeInvokeForClient(what, args);
+
+        int retryCounter = args.getInt("retry_counter");
+        String url = args.getString("url");
+        BLog.i(TAG, "onNativeInvoke what = " + what + ",index = " + index + ",retryCounter = " + retryCounter + ",url = " + url);
+        return ret;
     }
 
     private boolean onNativeInvokeForClient(int what, Bundle args) {
