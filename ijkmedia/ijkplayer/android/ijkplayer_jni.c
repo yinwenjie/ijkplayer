@@ -28,7 +28,7 @@
 #include <unistd.h>
 #include "j4a/class/java/util/ArrayList.h"
 #include "j4a/class/android/os/Bundle.h"
-#include "j4a/class/tv/danmaku/ijk/media/player/services/IjkMediaPlayerService.h"
+#include "j4a/class/tv/danmaku/ijk/media/player/services/IjkMediaPlayerClient.h"
 #include "j4a/class/tv/danmaku/ijk/media/player/misc/IMediaDataSource.h"
 #include "j4a/class/tv/danmaku/ijk/media/player/misc/IAndroidIO.h"
 #include "ijksdl/ijksdl_log.h"
@@ -41,7 +41,7 @@
 #include "ijkavformat/ijkavformat.h"
 
 #define JNI_MODULE_PACKAGE      "tv/danmaku/ijk/media/player"
-#define JNI_CLASS_IJKPLAYER_SERVICE     "tv/danmaku/ijk/media/player/services/IjkMediaPlayerService"
+#define JNI_CLASS_IJKPLAYER_SERVICE     "tv/danmaku/ijk/media/player/services/IjkMediaPlayerClient"
 #define JNI_IJK_MEDIA_EXCEPTION "tv/danmaku/ijk/media/player/IjkMediaException"
 
 #define IJK_CHECK_MPRET_GOTO(retval, env, label) \
@@ -64,7 +64,7 @@ static IjkMediaPlayer *jni_get_media_player(JNIEnv* env, jobject thiz)
 {
     pthread_mutex_lock(&g_clazz.mutex);
 
-    IjkMediaPlayer *mp = (IjkMediaPlayer *) (intptr_t) J4AC_IjkMediaPlayerService__mNativeMediaPlayerService__get__catchAll(env, thiz);
+    IjkMediaPlayer *mp = (IjkMediaPlayer *) (intptr_t) J4AC_IjkMediaPlayerClient__mNativeMediaPlayerClient__get__catchAll(env, thiz);
     if (mp) {
         ijkmp_inc_ref(mp);
     }
@@ -77,11 +77,11 @@ static IjkMediaPlayer *jni_set_media_player(JNIEnv* env, jobject thiz, IjkMediaP
 {
     pthread_mutex_lock(&g_clazz.mutex);
 
-    IjkMediaPlayer *old = (IjkMediaPlayer*) (intptr_t) J4AC_IjkMediaPlayerService__mNativeMediaPlayerService__get__catchAll(env, thiz);
+    IjkMediaPlayer *old = (IjkMediaPlayer*) (intptr_t) J4AC_IjkMediaPlayerClient__mNativeMediaPlayerClient__get__catchAll(env, thiz);
     if (mp) {
         ijkmp_inc_ref(mp);
     }
-    J4AC_IjkMediaPlayerService__mNativeMediaPlayerService__set__catchAll(env, thiz, (intptr_t) mp);
+    J4AC_IjkMediaPlayerClient__mNativeMediaPlayerClient__set__catchAll(env, thiz, (intptr_t) mp);
 
     pthread_mutex_unlock(&g_clazz.mutex);
 
@@ -99,11 +99,11 @@ static int64_t jni_set_media_data_source(JNIEnv* env, jobject thiz, jobject medi
 
     pthread_mutex_lock(&g_clazz.mutex);
 
-    jobject old = (jobject) (intptr_t) J4AC_IjkMediaPlayerService__mNativeMediaDataSource__get__catchAll(env, thiz);
+    jobject old = (jobject) (intptr_t) J4AC_IjkMediaPlayerClient__mNativeMediaDataSource__get__catchAll(env, thiz);
     if (old) {
         J4AC_IMediaDataSource__close__catchAll(env, old);
         J4A_DeleteGlobalRef__p(env, &old);
-        J4AC_IjkMediaPlayerService__mNativeMediaDataSource__set__catchAll(env, thiz, 0);
+        J4AC_IjkMediaPlayerClient__mNativeMediaDataSource__set__catchAll(env, thiz, 0);
     }
 
     if (media_data_source) {
@@ -112,7 +112,7 @@ static int64_t jni_set_media_data_source(JNIEnv* env, jobject thiz, jobject medi
             goto fail;
 
         nativeMediaDataSource = (int64_t) (intptr_t) global_media_data_source;
-        J4AC_IjkMediaPlayerService__mNativeMediaDataSource__set__catchAll(env, thiz, (jlong) nativeMediaDataSource);
+        J4AC_IjkMediaPlayerClient__mNativeMediaDataSource__set__catchAll(env, thiz, (jlong) nativeMediaDataSource);
     }
 
 fail:
@@ -126,11 +126,11 @@ static int64_t jni_set_ijkio_androidio(JNIEnv* env, jobject thiz, jobject ijk_io
 
     pthread_mutex_lock(&g_clazz.mutex);
 
-    jobject old = (jobject) (intptr_t) J4AC_IjkMediaPlayerService__mNativeAndroidIO__get__catchAll(env, thiz);
+    jobject old = (jobject) (intptr_t) J4AC_IjkMediaPlayerClient__mNativeAndroidIO__get__catchAll(env, thiz);
     if (old) {
         J4AC_IAndroidIO__close__catchAll(env, old);
         J4A_DeleteGlobalRef__p(env, &old);
-        J4AC_IjkMediaPlayerService__mNativeAndroidIO__set__catchAll(env, thiz, 0);
+        J4AC_IjkMediaPlayerClient__mNativeAndroidIO__set__catchAll(env, thiz, 0);
     }
 
     if (ijk_io) {
@@ -138,7 +138,7 @@ static int64_t jni_set_ijkio_androidio(JNIEnv* env, jobject thiz, jobject ijk_io
         if (J4A_ExceptionCheck__catchAll(env) || !global_ijkio_androidio)
             goto fail;
         nativeAndroidIO = (int64_t) (intptr_t) global_ijkio_androidio;
-        J4AC_IjkMediaPlayerService__mNativeAndroidIO__set__catchAll(env, thiz, (jlong) nativeAndroidIO);
+        J4AC_IjkMediaPlayerClient__mNativeAndroidIO__set__catchAll(env, thiz, (jlong) nativeAndroidIO);
     }
 
 fail:
@@ -791,7 +791,7 @@ inject_callback(void *opaque, int what, void *data, size_t data_size)
             J4AC_Bundle__putString__withCString__catchAll(env, jbundle, "url", real_data->url);
             J4AC_Bundle__putInt__withCString__catchAll(env, jbundle, "segment_index", real_data->segment_index);
             J4AC_Bundle__putInt__withCString__catchAll(env, jbundle, "retry_counter", real_data->retry_counter);
-            real_data->is_handled = J4AC_IjkMediaPlayerService__onNativeInvoke(env, weak_thiz, what, jbundle);
+            real_data->is_handled = J4AC_IjkMediaPlayerClient__onNativeInvoke(env, weak_thiz, what, jbundle);
             if (J4A_ExceptionCheck__catchAll(env)) {
                 goto fail;
             }
@@ -817,7 +817,7 @@ inject_callback(void *opaque, int what, void *data, size_t data_size)
             J4AC_Bundle__putLong__withCString__catchAll(env, jbundle, "offset", real_data->offset);
             J4AC_Bundle__putInt__withCString__catchAll(env, jbundle, "error", real_data->error);
             J4AC_Bundle__putInt__withCString__catchAll(env, jbundle, "http_code", real_data->http_code);
-            J4AC_IjkMediaPlayerService__onNativeInvoke(env, weak_thiz, what, jbundle);
+            J4AC_IjkMediaPlayerClient__onNativeInvoke(env, weak_thiz, what, jbundle);
             if (J4A_ExceptionCheck__catchAll(env))
                 goto fail;
             ret = 0;
@@ -836,7 +836,7 @@ inject_callback(void *opaque, int what, void *data, size_t data_size)
             J4AC_Bundle__putString__withCString__catchAll(env, jbundle, "ip", real_data->ip);
             J4AC_Bundle__putInt__withCString__catchAll(env, jbundle, "port", real_data->port);
             J4AC_Bundle__putInt__withCString__catchAll(env, jbundle, "fd", real_data->fd);
-            J4AC_IjkMediaPlayerService__onNativeInvoke(env, weak_thiz, what, jbundle);
+            J4AC_IjkMediaPlayerClient__onNativeInvoke(env, weak_thiz, what, jbundle);
             if (J4A_ExceptionCheck__catchAll(env))
                 goto fail;
             ret = 0;
@@ -862,7 +862,7 @@ static bool mediacodec_select_callback(void *opaque, ijkmp_mediacodecinfo_contex
         return -1;
     }
 
-    found_codec_name = J4AC_IjkMediaPlayerService__onSelectCodec__withCString__asCBuffer(env, weak_this, mcc->mime_type, mcc->profile, mcc->level, mcc->codec_name, sizeof(mcc->codec_name));
+    found_codec_name = J4AC_IjkMediaPlayerClient__onSelectCodec__withCString__asCBuffer(env, weak_this, mcc->mime_type, mcc->profile, mcc->level, mcc->codec_name, sizeof(mcc->codec_name));
     if (J4A_ExceptionCheck__catchAll(env) || !found_codec_name) {
         ALOGE("%s: onSelectCodec failed\n", __func__);
         goto fail;
@@ -875,14 +875,14 @@ fail:
 inline static void post_event(JNIEnv *env, jobject weak_this, int what, int arg1, int arg2)
 {
     // MPTRACE("post_event(%p, %p, %d, %d, %d)", (void*)env, (void*) weak_this, what, arg1, arg2);
-    J4AC_IjkMediaPlayerService__postEventFromNative(env, weak_this, what, arg1, arg2, NULL);
+    J4AC_IjkMediaPlayerClient__postEventFromNative(env, weak_this, what, arg1, arg2, NULL);
     // MPTRACE("post_event()=void");
 }
 
 inline static void post_event2(JNIEnv *env, jobject weak_this, int what, int arg1, int arg2, jobject obj)
 {
     // MPTRACE("post_event2(%p, %p, %d, %d, %d, %p)", (void*)env, (void*) weak_this, what, arg1, arg2, (void*)obj);
-    J4AC_IjkMediaPlayerService__postEventFromNative(env, weak_this, what, arg1, arg2, obj);
+    J4AC_IjkMediaPlayerClient__postEventFromNative(env, weak_this, what, arg1, arg2, obj);
     // MPTRACE("post_event2()=void");
 }
 
