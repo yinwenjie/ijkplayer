@@ -19,12 +19,8 @@
 package tv.danmaku.ijk.media.player;
 
 import android.view.Surface;
-import tv.danmaku.ijk.media.player.IIjkMediaPlayerClient;
 
 interface IIjkMediaPlayer {
-    void registerClient(IIjkMediaPlayerClient client);
-    void unregisterClient();
-    void create();
     void start();
     void pause();
     void stop();

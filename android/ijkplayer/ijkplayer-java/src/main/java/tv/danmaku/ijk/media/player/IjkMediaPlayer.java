@@ -27,7 +27,6 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.res.AssetFileDescriptor;
 import android.graphics.SurfaceTexture;
-import android.graphics.Rect;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.media.RingtoneManager;
@@ -57,7 +56,6 @@ import java.io.FileDescriptor;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
-import java.lang.reflect.Field;
 import java.security.InvalidParameterException;
 import java.util.ArrayList;
 import java.util.Locale;
@@ -67,8 +65,6 @@ import tv.danmaku.ijk.media.player.misc.IMediaDataSource;
 import tv.danmaku.ijk.media.player.misc.ITrackInfo;
 import tv.danmaku.ijk.media.player.misc.IjkTrackInfo;
 import tv.danmaku.ijk.media.player.pragma.DebugLog;
-import tv.danmaku.ijk.media.player.IIjkMediaPlayer;
-import tv.danmaku.ijk.media.player.IIjkMediaPlayerClient;
 import tv.danmaku.ijk.media.player.services.IjkMediaPlayerService;
 
 /**
@@ -196,7 +192,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
     private String mDataSource;
     private Context mContext;
-    private IIjkMediaPlayer mIjkplayerService;
+    private IIjkMediaPlayer mPlayer;
+    private IIjkMediaPlayerService mService;
     private boolean mServiceIsConnected;
     private IjkMediaPlayerBinder mClient;
     private EventHandler mEventHandler;
@@ -204,7 +201,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     private int mPlayerAction;
     private HandlerThread mHandleThread;
     private SomeWorkHandler mSomeWorkHandle;
-    private ArrayList<Message> mWaitList;
+    private final ArrayList<Message> mWaitList = new ArrayList<>();
     private boolean mHappenAnr = false;
 
     private static class SomeWorkHandler extends Handler {
@@ -227,8 +224,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
             switch (msg.what) {
                 case DO_PREPAREASYNC:
                     try {
-                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
-                            player.mIjkplayerService.prepareAsync();
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
+                            player.mPlayer.prepareAsync();
                         }
                     } catch (RemoteException e) {
                         player.onBuglyReport(e);
@@ -236,8 +233,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     break;
                 case DO_START:
                     try {
-                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
-                            player.mIjkplayerService.start();
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
+                            player.mPlayer.start();
                             player.stayAwake(true);
                         }
                     } catch (RemoteException e) {
@@ -249,8 +246,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     break;
                 case DO_PAUSE:
                     try {
-                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
-                            player.mIjkplayerService.pause();
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
+                            player.mPlayer.pause();
                             player.stayAwake(false);
                         }
                     } catch (RemoteException e) {
@@ -259,8 +256,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     break;
                 case DO_RESET:
                     try {
-                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
-                            player.mIjkplayerService.reset();
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
+                            player.mPlayer.reset();
                             player.stayAwake(false);
                         }
                     } catch (RemoteException e) {
@@ -271,8 +268,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     break;
                 case DO_STOP:
                     try {
-                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
-                            player.mIjkplayerService.stop();
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
+                            player.mPlayer.stop();
                             player.stayAwake(false);
                         }
                     } catch (RemoteException e) {
@@ -281,8 +278,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     break;
                 case DO_SETSURFACE:
                     try {
-                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
-                            player.mIjkplayerService.setSurface((Surface) msg.obj);
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
+                            player.mPlayer.setSurface((Surface) msg.obj);
                             player.updateSurfaceScreenOn();
                         }
                     } catch (RemoteException e) {
@@ -291,8 +288,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     break;
                 case DO_SETDATASOURCE:
                     try {
-                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
-                            player.mIjkplayerService.setDataSource((String) msg.obj);
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
+                            player.mPlayer.setDataSource((String) msg.obj);
                         }
                     } catch (RemoteException e) {
                         player.onBuglyReport(e);
@@ -300,8 +297,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     break;
                 case DO_SETDATASOURCEBASE64:
                     try {
-                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
-                            player.mIjkplayerService.setDataSourceBase64((String) msg.obj);
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
+                            player.mPlayer.setDataSourceBase64((String) msg.obj);
                         }
                     } catch (RemoteException e) {
                         player.onBuglyReport(e);
@@ -311,8 +308,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     break;
                 case DO_SETDATASOURCEFD:
                     try {
-                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
-                            player.mIjkplayerService.setDataSourceFd((ParcelFileDescriptor) msg.obj);
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
+                            player.mPlayer.setDataSourceFd((ParcelFileDescriptor) msg.obj);
                         }
                     } catch (RemoteException e) {
                         player.onBuglyReport(e);
@@ -320,8 +317,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     break;
                 case DO_SETSTREAMSELECTED:
                     try {
-                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
-                            player.mIjkplayerService.setStreamSelected(msg.arg1, msg.arg2 > 0);
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
+                            player.mPlayer.setStreamSelected(msg.arg1, msg.arg2 > 0);
                         }
                     } catch (RemoteException e) {
                         player.onBuglyReport(e);
@@ -329,8 +326,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     break;
                 case DO_SEEKTO:
                     try {
-                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
-                            player.mIjkplayerService.seekTo((Long) msg.obj);
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
+                            player.mPlayer.seekTo((Long) msg.obj);
                         }
                     } catch (RemoteException e) {
                         player.onBuglyReport(e);
@@ -338,8 +335,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     break;
                 case DO_SETLOOPCOUNT:
                     try {
-                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
-                            player.mIjkplayerService.setLoopCount(msg.arg1);
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
+                            player.mPlayer.setLoopCount(msg.arg1);
                         }
                     } catch (RemoteException e) {
                         player.onBuglyReport(e);
@@ -347,8 +344,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     break;
                 case DO_SETPROPERTYFLOAT:
                     try {
-                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
-                            player.mIjkplayerService.setPropertyFloat(msg.arg1, (Float) msg.obj);
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
+                            player.mPlayer.setPropertyFloat(msg.arg1, (Float) msg.obj);
                         }
                     } catch (RemoteException e) {
                         player.onBuglyReport(e);
@@ -358,10 +355,10 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     break;
                 case DO_SETVOLUME:
                     try {
-                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
                             Pair<Float, Float> volume = (Pair<Float, Float>) msg.obj;
                             if (volume != null) {
-                                player.mIjkplayerService.setVolume(volume.first, volume.second);
+                                player.mPlayer.setVolume(volume.first, volume.second);
                             }
                         }
                     } catch (RemoteException e) {
@@ -370,10 +367,10 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     break;
                 case DO_SETOPTIONSTRING:
                     try {
-                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
                             Pair<String, String> option = (Pair<String, String>) msg.obj;
                             if (option != null) {
-                                player.mIjkplayerService.setOptionString(msg.arg1, option.first, option.second);
+                                player.mPlayer.setOptionString(msg.arg1, option.first, option.second);
                             }
                         }
                     } catch (RemoteException e) {
@@ -382,10 +379,10 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     break;
                 case DO_SETOPTIONLONG:
                     try {
-                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
                             Pair<String, Long> option = (Pair<String, Long>) msg.obj;
                             if (option != null) {
-                                player.mIjkplayerService.setOptionLong(msg.arg1, option.first, option.second);
+                                player.mPlayer.setOptionLong(msg.arg1, option.first, option.second);
                             }
                         }
                     } catch (RemoteException e) {
@@ -394,8 +391,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     break;
                 case DO_NATIVEFINALIZE:
                     try {
-                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
-                            player.mIjkplayerService.nativeFinalize();
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
+                            player.mPlayer.nativeFinalize();
                         }
                     } catch (RemoteException e) {
                         player.onBuglyReport(e);
@@ -403,8 +400,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     break;
                 case DO_NATIVEPROFILEBEGIN:
                     try {
-                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
-                            player.mIjkplayerService.nativeProfileBegin((String) msg.obj);
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
+                            player.mPlayer.nativeProfileBegin((String) msg.obj);
                         }
                     } catch (RemoteException e) {
                         player.onBuglyReport(e);
@@ -412,8 +409,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     break;
                 case DO_NATIVEPROFILEEND:
                     try {
-                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
-                            player.mIjkplayerService.nativeProfileEnd();
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
+                            player.mPlayer.nativeProfileEnd();
                         }
                     } catch (RemoteException e) {
                         player.onBuglyReport(e);
@@ -421,31 +418,33 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     break;
                 case DO_NATIVESETLOGLEVEL:
                     try {
-                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
-                            player.mIjkplayerService.nativeSetLogLevel(msg.arg1);
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
+                            player.mPlayer.nativeSetLogLevel(msg.arg1);
                         }
                     } catch (RemoteException e) {
                         player.onBuglyReport(e);
                     }
                     break;
                 case DO_MSG_SAVE:
-                    player.mWaitList.add((Message) msg.obj);
                     break;
                 case SERVICE_CONNECTED:
-                    int listSize = player.mWaitList.size();
-                    if (listSize > 0 && player.mServiceIsConnected) {
-                        for (int i = 0; i < listSize; i++) {
-                            this.sendMessage(player.mWaitList.get(i));
+                    synchronized (player.mWaitList) {
+                        int listSize = player.mWaitList.size();
+                        if (listSize > 0) {
+                            for (int i = 0; i < listSize; i++) {
+                                this.sendMessage(player.mWaitList.get(i));
+                            }
+                            player.mWaitList.clear();
                         }
-                        player.mWaitList.clear();
+                        player.mServiceIsConnected = true;
                     }
                     break;
                 case SERVICE_DISCONNECTED:
                     break;
                 case DO_SETANDROIDIOCALLBACK:
                     try {
-                        if (player.mIjkplayerService != null && player.mServiceIsConnected) {
-                            player.mIjkplayerService.setAndroidIOCallback();
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
+                            player.mPlayer.setAndroidIOCallback();
                         }
                     } catch (RemoteException e) {
                         player.onBuglyReport(e);
@@ -651,18 +650,16 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
-            mIjkplayerService = IIjkMediaPlayer.Stub.asInterface(service);
+            mService = IIjkMediaPlayerService.Stub.asInterface(service);
             try {
                 DebugLog.i(TAG, "IjkMediaPlayer onServiceConnected\n");
-                mIjkplayerService.registerClient(mClient);
-                mIjkplayerService.create();
-                mServiceIsConnected = true;
                 IjkMediaPlayer player = mWeakPlayer.get();
+                mPlayer = mService.create(mClient.hashCode(), mClient);
+                if (mOnServiceIsConnectedListener != null)
+                    mOnServiceIsConnectedListener.onServiceIsConnected(mServiceIsConnected);
                 if (player != null) {
                     player.mSomeWorkHandle.obtainMessage(SERVICE_CONNECTED).sendToTarget();
                 }
-                if (mOnServiceIsConnectedListener != null)
-                    mOnServiceIsConnectedListener.onServiceIsConnected(mServiceIsConnected);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -672,12 +669,12 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         public void onServiceDisconnected(ComponentName name) {
             DebugLog.w(TAG, "IjkMediaPlayer onServiceDisconnected\n");
             mServiceIsConnected = false;
-            IjkMediaPlayer player = mWeakPlayer.get();
+            mService = null;
             if (mOnServiceIsConnectedListener != null)
                 mOnServiceIsConnectedListener.onServiceIsConnected(mServiceIsConnected);
-            mIjkplayerService = null;
-            if (mPlayerAction != PLAYER_ACTION_IS_RELEASE)
+            if (mPlayerAction != PLAYER_ACTION_IS_RELEASE) {
                 serviceDisConnectedHandle();
+            }
         }
     }
 
@@ -742,7 +739,6 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         } else {
             mEventHandler = null;
         }
-        mWaitList = new ArrayList<>();
         mHandleThread = new HandlerThread("IjkMediaPlayer:Handler");
         mHandleThread.start();
         mSomeWorkHandle = new SomeWorkHandler(this, mHandleThread.getLooper());
@@ -777,7 +773,6 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         } else {
             mEventHandler = null;
         }
-        mWaitList = new ArrayList<>();
         mHandleThread = new HandlerThread("IjkMediaPlayer:Handler");
         mHandleThread.start();
         mSomeWorkHandle = new SomeWorkHandler(this, mHandleThread.getLooper());
@@ -830,10 +825,16 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
             surface = null;
         }
 
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_SETSURFACE, surface).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_SETSURFACE, surface)).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_SETSURFACE, surface).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_SETSURFACE, surface));
+                }
+            }
         }
     }
 
@@ -863,18 +864,30 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     "setScreenOnWhilePlaying(true) is ineffective for Surface");
         }
         mSurfaceHolder = null;
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_SETSURFACE, surface).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_SETSURFACE, surface)).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_SETSURFACE, surface).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_SETSURFACE, surface));
+                }
+            }
         }
     }
 
     public void setAndroidIOCallback() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_SETANDROIDIOCALLBACK).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_SETANDROIDIOCALLBACK)).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_SETANDROIDIOCALLBACK).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_SETANDROIDIOCALLBACK));
+                }
+            }
         }
     }
     /**
@@ -967,19 +980,31 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     @Override
     public void setDataSource(String path) {
         mDataSource = path;
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_SETDATASOURCE, path).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_SETDATASOURCE, path)).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_SETDATASOURCE, path).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_SETDATASOURCE, path));
+                }
+            }
         }
     }
 
     public void setDataSourceBase64(String path) {
         mDataSource = path;
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_SETDATASOURCEBASE64, path).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_SETDATASOURCEBASE64, path)).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_SETDATASOURCEBASE64, path).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_SETDATASOURCEBASE64, path));
+                }
+            }
         }
     }
 
@@ -1019,10 +1044,16 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     @Override
     public void setDataSource(FileDescriptor fd) throws IOException {
         ParcelFileDescriptor pfd = ParcelFileDescriptor.dup(fd);
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_SETDATASOURCEFD, pfd).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_SETDATASOURCEFD, pfd)).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_SETDATASOURCEFD, pfd).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_SETDATASOURCEFD, pfd));
+                }
+            }
         }
     }
 
@@ -1042,11 +1073,6 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         setDataSource(fd);
     }
 
-//    public void setDataSource(IMediaDataSource mediaDataSource)
-//            throws IllegalArgumentException, SecurityException, IllegalStateException {
-//        _setDataSource(mediaDataSource);
-//    }
-
     @Override
     public String getDataSource() {
         return mDataSource;
@@ -1054,37 +1080,61 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
     @Override
     public void prepareAsync() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_PREPAREASYNC).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_PREPAREASYNC)).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_PREPAREASYNC).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_PREPAREASYNC));
+                }
+            }
         }
     }
 
     @Override
     public void start() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_START).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_START)).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_START).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_START));
+                }
+            }
         }
     }
 
     @Override
     public void stop() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_STOP).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_STOP)).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_STOP).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_STOP));
+                }
+            }
         }
     }
 
     @Override
     public void pause() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_PAUSE).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_PAUSE)).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_PAUSE).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_PAUSE));
+                }
+            }
         }
     }
 
@@ -1171,9 +1221,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     public int getSelectedTrack(int trackType) {
         switch (trackType) {
             case ITrackInfo.MEDIA_TRACK_TYPE_VIDEO:
-                if (mIjkplayerService != null && mServiceIsConnected) {
+                if (mPlayer != null && mServiceIsConnected) {
                     try {
-                        return (int) mIjkplayerService.getPropertyLong(FFP_PROP_INT64_SELECTED_VIDEO_STREAM, -1);
+                        return (int) mPlayer.getPropertyLong(FFP_PROP_INT64_SELECTED_VIDEO_STREAM, -1);
                     } catch (RemoteException e) {
                         onBuglyReport(e);
                         return -1;
@@ -1182,9 +1232,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     return -1;
                 }
             case ITrackInfo.MEDIA_TRACK_TYPE_AUDIO:
-                if (mIjkplayerService != null && mServiceIsConnected) {
+                if (mPlayer != null && mServiceIsConnected) {
                     try {
-                        return (int) mIjkplayerService.getPropertyLong(FFP_PROP_INT64_SELECTED_AUDIO_STREAM, -1);
+                        return (int) mPlayer.getPropertyLong(FFP_PROP_INT64_SELECTED_AUDIO_STREAM, -1);
                     } catch (RemoteException e) {
                         onBuglyReport(e);
                     }
@@ -1193,9 +1243,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     return -1;
                 }
             case ITrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT:
-                if (mIjkplayerService != null && mServiceIsConnected) {
+                if (mPlayer != null && mServiceIsConnected) {
                     try {
-                        return (int) mIjkplayerService.getPropertyLong(FFP_PROP_INT64_SELECTED_TIMEDTEXT_STREAM, -1);
+                        return (int) mPlayer.getPropertyLong(FFP_PROP_INT64_SELECTED_TIMEDTEXT_STREAM, -1);
                     } catch (RemoteException e) {
                         onBuglyReport(e);
                     }
@@ -1211,20 +1261,32 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     // experimental, should set DEFAULT_MIN_FRAMES and MAX_MIN_FRAMES to 25
     // TODO: @Override
     public void selectTrack(int track) {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_SETSTREAMSELECTED, track, 1).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_SETSTREAMSELECTED, track, 1)).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_SETSTREAMSELECTED, track, 1).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_SETSTREAMSELECTED, track, 1));
+                }
+            }
         }
     }
 
     // experimental, should set DEFAULT_MIN_FRAMES and MAX_MIN_FRAMES to 25
     // TODO: @Override
     public void deselectTrack(int track) {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_SETSTREAMSELECTED, track, 0).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_SETSTREAMSELECTED, track, 0)).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_SETSTREAMSELECTED, track, 0).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_SETSTREAMSELECTED, track, 0));
+                }
+            }
         }
     }
 
@@ -1250,9 +1312,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
     @Override
     public boolean isPlaying() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.isPlaying();
+                return mPlayer.isPlaying();
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1262,18 +1324,24 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
     @Override
     public void seekTo(long msec) {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_SEEKTO, msec).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_SEEKTO, msec)).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_SEEKTO, msec).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_SEEKTO, msec));
+                }
+            }
         }
     }
 
     @Override
     public long getCurrentPosition() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getCurrentPosition();
+                return mPlayer.getCurrentPosition();
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1283,9 +1351,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
     @Override
     public long getDuration() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getDuration();
+                return mPlayer.getDuration();
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1311,15 +1379,6 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
      */
     @Override
     public void release() {
-//        if (mIjkplayerService != null && mServiceIsConnected) {
-//            mSomeWorkHandle.obtainMessage(DO_RELEASE).sendToTarget();
-//        } else {
-//            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_RELEASE)).sendToTarget();
-//        }
-        handleRelease();
-    }
-
-    private void handleRelease() {
         stayAwake(false);
         updateSurfaceScreenOn();
         mPlayerAction = PLAYER_ACTION_IS_RELEASE;
@@ -1335,26 +1394,32 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         }
 
         mWaitList.clear();
-        if (mIjkplayerService != null) {
+        if (mPlayer != null) {
             try {
-                mIjkplayerService.release();
-                mIjkplayerService.unregisterClient();
+                mPlayer.release();
+                mService.removeClient(mClient.hashCode());
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
         }
         mContext.unbindService(mIjkMediaPlayerServiceConnection);
-        mIjkplayerService = null;
+        mPlayer = null;
         mIjkMediaPlayerServiceConnection = null;
         mClient = null;
     }
 
     @Override
     public void reset() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_RESET).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_RESET)).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_RESET).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_RESET));
+                }
+            }
         }
     }
 
@@ -1368,10 +1433,16 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         int loopCount = looping ? 0 : 1;
         setOption(OPT_CATEGORY_PLAYER, "loop", loopCount);
 
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_SETLOOPCOUNT, loopCount, 0).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_SETLOOPCOUNT, loopCount, 0)).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_SETLOOPCOUNT, loopCount, 0).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_SETLOOPCOUNT, loopCount, 0));
+                }
+            }
         }
     }
 
@@ -1383,9 +1454,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     @Override
     public boolean isLooping() {
         int loopCount = 0;
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                loopCount = mIjkplayerService.getLoopCount();
+                loopCount = mPlayer.getLoopCount();
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1394,17 +1465,23 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public void setSpeed(float speed) {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_SETPROPERTYFLOAT, FFP_PROP_FLOAT_PLAYBACK_RATE, 0, speed).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_SETPROPERTYFLOAT, FFP_PROP_FLOAT_PLAYBACK_RATE, 0, speed)).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_SETPROPERTYFLOAT, FFP_PROP_FLOAT_PLAYBACK_RATE, 0, speed).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_SETPROPERTYFLOAT, FFP_PROP_FLOAT_PLAYBACK_RATE, 0, speed));
+                }
+            }
         }
     }
 
     public float getSpeed(float speed) {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getPropertyFloat(FFP_PROP_FLOAT_PLAYBACK_RATE, .0f);
+                return mPlayer.getPropertyFloat(FFP_PROP_FLOAT_PLAYBACK_RATE, .0f);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1413,9 +1490,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public int getVideoDecoder() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return (int) mIjkplayerService.getPropertyLong(FFP_PROP_INT64_VIDEO_DECODER, FFP_PROPV_DECODER_UNKNOWN);
+                return (int) mPlayer.getPropertyLong(FFP_PROP_INT64_VIDEO_DECODER, FFP_PROPV_DECODER_UNKNOWN);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1424,9 +1501,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public float getVideoOutputFramesPerSecond() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getPropertyFloat(PROP_FLOAT_VIDEO_OUTPUT_FRAMES_PER_SECOND, 0.0f);
+                return mPlayer.getPropertyFloat(PROP_FLOAT_VIDEO_OUTPUT_FRAMES_PER_SECOND, 0.0f);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1435,9 +1512,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public float getVideoDecodeFramesPerSecond() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getPropertyFloat(PROP_FLOAT_VIDEO_DECODE_FRAMES_PER_SECOND, 0.0f);
+                return mPlayer.getPropertyFloat(PROP_FLOAT_VIDEO_DECODE_FRAMES_PER_SECOND, 0.0f);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1446,9 +1523,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public long getVideoCachedDuration() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getPropertyLong(FFP_PROP_INT64_VIDEO_CACHED_DURATION, 0);
+                return mPlayer.getPropertyLong(FFP_PROP_INT64_VIDEO_CACHED_DURATION, 0);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1457,9 +1534,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public long getAudioCachedDuration() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getPropertyLong(FFP_PROP_INT64_AUDIO_CACHED_DURATION, 0);
+                return mPlayer.getPropertyLong(FFP_PROP_INT64_AUDIO_CACHED_DURATION, 0);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1468,9 +1545,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public long getVideoCachedBytes() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getPropertyLong(FFP_PROP_INT64_VIDEO_CACHED_BYTES, 0);
+                return mPlayer.getPropertyLong(FFP_PROP_INT64_VIDEO_CACHED_BYTES, 0);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1479,9 +1556,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public long getAudioCachedBytes() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getPropertyLong(FFP_PROP_INT64_AUDIO_CACHED_BYTES, 0);
+                return mPlayer.getPropertyLong(FFP_PROP_INT64_AUDIO_CACHED_BYTES, 0);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1490,9 +1567,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public long getVideoCachedPackets() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getPropertyLong(FFP_PROP_INT64_VIDEO_CACHED_PACKETS, 0);
+                return mPlayer.getPropertyLong(FFP_PROP_INT64_VIDEO_CACHED_PACKETS, 0);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1501,9 +1578,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public long getAudioCachedPackets() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getPropertyLong(FFP_PROP_INT64_AUDIO_CACHED_PACKETS, 0);
+                return mPlayer.getPropertyLong(FFP_PROP_INT64_AUDIO_CACHED_PACKETS, 0);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1512,9 +1589,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public long getAsyncStatisticBufBackwards() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getPropertyLong(FFP_PROP_INT64_ASYNC_STATISTIC_BUF_BACKWARDS, 0);
+                return mPlayer.getPropertyLong(FFP_PROP_INT64_ASYNC_STATISTIC_BUF_BACKWARDS, 0);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1523,9 +1600,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public long getAsyncStatisticBufForwards() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getPropertyLong(FFP_PROP_INT64_ASYNC_STATISTIC_BUF_FORWARDS, 0);
+                return mPlayer.getPropertyLong(FFP_PROP_INT64_ASYNC_STATISTIC_BUF_FORWARDS, 0);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1534,9 +1611,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public long getAsyncStatisticBufCapacity() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getPropertyLong(FFP_PROP_INT64_ASYNC_STATISTIC_BUF_CAPACITY, 0);
+                return mPlayer.getPropertyLong(FFP_PROP_INT64_ASYNC_STATISTIC_BUF_CAPACITY, 0);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1545,9 +1622,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public long getAndroidIOTrafficStatistic() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getAndroidIOTrafficStatistic();
+                return mPlayer.getAndroidIOTrafficStatistic();
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1556,9 +1633,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public long getTrafficStatisticByteCount() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getPropertyLong(FFP_PROP_INT64_TRAFFIC_STATISTIC_BYTE_COUNT, 0);
+                return mPlayer.getPropertyLong(FFP_PROP_INT64_TRAFFIC_STATISTIC_BYTE_COUNT, 0);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1567,9 +1644,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public long getCacheStatisticPhysicalPos() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getPropertyLong(FFP_PROP_INT64_CACHE_STATISTIC_PHYSICAL_POS, 0);
+                return mPlayer.getPropertyLong(FFP_PROP_INT64_CACHE_STATISTIC_PHYSICAL_POS, 0);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1578,9 +1655,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public long getCacheStatisticBufForwards() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getPropertyLong(FFP_PROP_INT64_CACHE_STATISTIC_BUF_FORWARDS, 0);
+                return mPlayer.getPropertyLong(FFP_PROP_INT64_CACHE_STATISTIC_BUF_FORWARDS, 0);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1589,9 +1666,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public long getCacheStatisticFilePos() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getPropertyLong(FFP_PROP_INT64_CACHE_STATISTIC_FILE_POS, 0);
+                return mPlayer.getPropertyLong(FFP_PROP_INT64_CACHE_STATISTIC_FILE_POS, 0);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1600,9 +1677,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public long getCacheStatisticCountBytes() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getPropertyLong(FFP_PROP_INT64_CACHE_STATISTIC_COUNT_BYTES, 0);
+                return mPlayer.getPropertyLong(FFP_PROP_INT64_CACHE_STATISTIC_COUNT_BYTES, 0);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1611,9 +1688,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public long getBitRate() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getPropertyLong(FFP_PROP_INT64_BIT_RATE, 0);
+                return mPlayer.getPropertyLong(FFP_PROP_INT64_BIT_RATE, 0);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1622,9 +1699,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public long getTcpSpeed() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getPropertyLong(FFP_PROP_INT64_TCP_SPEED, 0);
+                return mPlayer.getPropertyLong(FFP_PROP_INT64_TCP_SPEED, 0);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1633,9 +1710,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public long getSeekLoadDuration() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getPropertyLong(FFP_PROP_INT64_LATEST_SEEK_LOAD_DURATION, 0);
+                return mPlayer.getPropertyLong(FFP_PROP_INT64_LATEST_SEEK_LOAD_DURATION, 0);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1644,9 +1721,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public float getDropFrameRate() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getPropertyFloat(FFP_PROP_FLOAT_DROP_FRAME_RATE, 0.0f);
+                return mPlayer.getPropertyFloat(FFP_PROP_FLOAT_DROP_FRAME_RATE, 0.0f);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1656,18 +1733,24 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
     @Override
     public void setVolume(float leftVolume, float rightVolume) {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_SETVOLUME, new Pair<>(leftVolume, rightVolume)).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_SETVOLUME, new Pair<>(leftVolume, rightVolume))).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_SETVOLUME, new Pair<>(leftVolume, rightVolume)).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_SETVOLUME, new Pair<>(leftVolume, rightVolume)));
+                }
+            }
         }
     }
 
     @Override
     public int getAudioSessionId() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getAudioSessionId();
+                return mPlayer.getAudioSessionId();
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1681,9 +1764,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         mediaInfo.mMediaPlayerName = "ijkplayer";
 
         String videoCodecInfo = null;
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                videoCodecInfo = mIjkplayerService.getVideoCodecInfo();
+                videoCodecInfo = mPlayer.getVideoCodecInfo();
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1700,9 +1783,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         }
 
         String audioCodecInfo = null;
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                audioCodecInfo = mIjkplayerService.getAudioCodecInfo();
+                audioCodecInfo = mPlayer.getAudioCodecInfo();
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1718,9 +1801,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
             }
         }
         Bundle bundle = null;
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                bundle = mIjkplayerService.getMediaMeta();
+                bundle = mPlayer.getMediaMeta();
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1745,26 +1828,38 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
     public void setOption(int category, String name, String value)
     {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_SETOPTIONSTRING, category, 0, new Pair<>(name, value)).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_SETOPTIONSTRING, category, 0, new Pair<>(name, value))).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_SETOPTIONSTRING, category, 0, new Pair<>(name, value)).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_SETOPTIONSTRING, category, 0, new Pair<>(name, value)));
+                }
+            }
         }
     }
 
     public void setOption(int category, String name, long value)
     {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_SETOPTIONLONG, category, 0, new Pair<>(name, value)).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_SETOPTIONLONG, category, 0, new Pair<>(name, value))).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_SETOPTIONLONG, category, 0, new Pair<>(name, value)).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_SETOPTIONLONG, category, 0, new Pair<>(name, value)));
+                }
+            }
         }
     }
 
     public Bundle getMediaMeta() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getMediaMeta();
+                return mPlayer.getMediaMeta();
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1773,9 +1868,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public String getColorFormatName(int mediaCodecColorFormat) {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mIjkplayerService.getColorFormatName(mediaCodecColorFormat);
+                return mPlayer.getColorFormatName(mediaCodecColorFormat);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
@@ -1952,26 +2047,44 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public void nativeProfileBegin(String libName) {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_NATIVEPROFILEBEGIN, libName).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_NATIVEPROFILEBEGIN, libName)).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_NATIVEPROFILEBEGIN, libName).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_NATIVEPROFILEBEGIN, libName));
+                }
+            }
         }
     }
 
     public void nativeProfileEnd() {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_NATIVEPROFILEEND).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_NATIVEPROFILEEND)).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_NATIVEPROFILEEND).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_NATIVEPROFILEEND));
+                }
+            }
         }
     }
 
     public void nativeSetLogLevel(int level) {
-        if (mIjkplayerService != null && mServiceIsConnected) {
+        if (mPlayer != null && mServiceIsConnected) {
             mSomeWorkHandle.obtainMessage(DO_NATIVESETLOGLEVEL, level, 0).sendToTarget();
         } else {
-            mSomeWorkHandle.obtainMessage(DO_MSG_SAVE, mSomeWorkHandle.obtainMessage(DO_NATIVESETLOGLEVEL, level, 0)).sendToTarget();
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_NATIVESETLOGLEVEL, level, 0).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_NATIVESETLOGLEVEL, level, 0));
+                }
+            }
         }
     }
 }
