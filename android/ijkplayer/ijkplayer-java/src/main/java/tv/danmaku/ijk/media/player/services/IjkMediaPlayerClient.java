@@ -37,7 +37,6 @@ import tv.danmaku.ijk.media.player.annotations.CalledByNative;
 import tv.danmaku.ijk.media.player.ffmpeg.FFmpegApi;
 import tv.danmaku.ijk.media.player.misc.IAndroidIO;
 import tv.danmaku.ijk.media.player.misc.IMediaDataSource;
-import tv.danmaku.ijk.media.player.misc.SystemHttp;
 import tv.danmaku.ijk.media.player.pragma.DebugLog;
 
 public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
@@ -45,7 +44,6 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
     private HandlerThread mHandlerThread = null;
     private Handler mProtectHandle = null;
     private IIjkMediaPlayerClient mClient = null;
-    private SystemHttp mSystemHttp;
 
     private static final int MSG_NATIVE_PROTECT_CREATE               = 1;
     private static final int MSG_NATIVE_PROTECT_START                = 2;
@@ -346,9 +344,6 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
     @Override
     public void release() {
         mProtectHandle.sendEmptyMessageDelayed(MSG_NATIVE_PROTECT_RELEASE, PROTECT_DELAY);
-        if (mSystemHttp != null) {
-            mSystemHttp.abort();
-        }
         _release();
         mProtectHandle.removeMessages(MSG_NATIVE_PROTECT_RELEASE);
     }
@@ -369,27 +364,11 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
 
     @Override
     public long getAndroidIOTrafficStatistic() {
-        if (mSystemHttp != null) {
-            return mSystemHttp.getAndroidIOTrafficStatistic();
-        }
         return 0;
     }
 
     @Override
     public void setAndroidIOCallback() {
-        mProtectHandle.sendEmptyMessageDelayed(MSG_NATIVE_PROTECT_SETANDROIDIOCALLBACK, PROTECT_DELAY);
-        try {
-            mSystemHttp = new SystemHttp();
-            mSystemHttp.injectCallback(new IjkMediaPlayerClient.SystemApplication());
-            _setAndroidIOCallback(mSystemHttp);
-        } catch (IllegalArgumentException ex) {
-            ex.printStackTrace();
-        } catch (SecurityException ex) {
-            ex.printStackTrace();
-        } catch (IllegalStateException ex) {
-            ex.printStackTrace();
-        }
-        mProtectHandle.removeMessages(MSG_NATIVE_PROTECT_SETANDROIDIOCALLBACK);
     }
 
     @Override
