@@ -3,8 +3,8 @@ package tv.danmaku.ijk.media.player.services;
 import android.os.Bundle;
 
 @SimpleCClassName
-public class IjkMediaPlayerService {
-    private long mNativeMediaPlayerService;
+public class IjkMediaPlayerClient {
+    private long mNativeMediaPlayerClient;
     private long mNativeMediaDataSource;
     private long mNativeAndroidIO;
 
