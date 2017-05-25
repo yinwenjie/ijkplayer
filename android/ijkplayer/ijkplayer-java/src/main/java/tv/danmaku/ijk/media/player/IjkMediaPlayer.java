@@ -670,6 +670,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
             DebugLog.w(TAG, "IjkMediaPlayer onServiceDisconnected\n");
             mServiceIsConnected = false;
             mService = null;
+            mPlayer = null;
             if (mOnServiceIsConnectedListener != null)
                 mOnServiceIsConnectedListener.onServiceIsConnected(mServiceIsConnected);
             if (mPlayerAction != PLAYER_ACTION_IS_RELEASE) {
