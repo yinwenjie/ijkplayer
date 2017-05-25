@@ -165,13 +165,15 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
     public native int _getAudioSessionId();
 
     private native String _getVideoCodecInfo()
-            throws IllegalArgumentException;
+            throws IllegalStateException;
 
     private native String _getAudioCodecInfo();
 
-    private native void _setOption(int category, String name, String value);
+    private native void _setOption(int category, String name, String value)
+            throws IllegalStateException;
 
-    private native void _setOption(int category, String name, long value);
+    private native void _setOption(int category, String name, long value)
+            throws IllegalStateException;
 
     private native Bundle _getMediaMeta();
 
@@ -579,14 +581,22 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
     @Override
     public void setOptionString(int category, String name, String value) {
         mProtectHandle.sendEmptyMessageDelayed(MSG_NATIVE_PROTECT_SETOPTIONSTRING, PROTECT_DELAY);
-        _setOption(category, name, value);
+        try {
+            _setOption(category, name, value);
+        } catch (IllegalStateException e) {
+            e.printStackTrace();
+        }
         mProtectHandle.removeMessages(MSG_NATIVE_PROTECT_SETOPTIONSTRING);
     }
 
     @Override
     public void setOptionLong(int category, String name, long value) {
         mProtectHandle.sendEmptyMessageDelayed(MSG_NATIVE_PROTECT_SETOPTIONLONG, PROTECT_DELAY);
-        _setOption(category, name, value);
+        try {
+            _setOption(category, name, value);
+        } catch (IllegalStateException e) {
+            e.printStackTrace();
+        }
         mProtectHandle.removeMessages(MSG_NATIVE_PROTECT_SETOPTIONLONG);
     }
 
