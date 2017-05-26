@@ -41,6 +41,7 @@ import tv.danmaku.ijk.media.player.pragma.DebugLog;
 
 public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
     private static final String TAG = "IjkMediaPlayerClient";
+    public boolean mBlocked = false;
     private HandlerThread mHandlerThread = null;
     private Handler mProtectHandle = null;
     private IIjkMediaPlayerClient mClient = null;
@@ -194,8 +195,18 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
             public void handleMessage(Message msg) {
                 int what = msg.what;
                 switch (what) {
+                    case MSG_NATIVE_PROTECT_RELEASE:
+                        mBlocked = true;
+                        if (mClient != null) {
+                            try {
+                                mClient.onReportAnr(what);
+                            } catch (RemoteException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                        break;
                     default:
-                        DebugLog.e(TAG, "ANR happened, IjkMediaPlayerService will reboot");
+                        BLog.e(TAG, "ANR happened, IjkMediaPlayerService will reboot");
                         if (mClient != null) {
                             try {
                                 mClient.onReportAnr(what);
@@ -347,6 +358,7 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
     public void release() {
         mProtectHandle.sendEmptyMessageDelayed(MSG_NATIVE_PROTECT_RELEASE, PROTECT_DELAY);
         _release();
+        mBlocked = false;
         mProtectHandle.removeMessages(MSG_NATIVE_PROTECT_RELEASE);
     }
 

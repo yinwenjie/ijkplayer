@@ -27,6 +27,7 @@ import android.util.SparseArray;
 import java.io.File;
 import java.lang.ref.WeakReference;
 
+import tv.danmaku.android.log.BLog;
 import tv.danmaku.ijk.media.player.IIjkMediaPlayer;
 import tv.danmaku.ijk.media.player.IIjkMediaPlayerClient;
 import tv.danmaku.ijk.media.player.IIjkMediaPlayerService;
@@ -86,7 +87,8 @@ public class IjkMediaPlayerService extends Service {
             synchronized (mClients) {
                 if (mClients != null) {
                     IjkMediaPlayerClient c = new IjkMediaPlayerClient(client);
-                    mClients.append(connId, new WeakReference<IIjkMediaPlayer>(c));
+                    mClients.put(connId, new WeakReference<IIjkMediaPlayer>(c));
+                    BLog.i(TAG, "IIjkMediaPlayerService create mClients.size() = " + mClients.size());
                     return c;
                 }
             }
@@ -97,6 +99,16 @@ public class IjkMediaPlayerService extends Service {
         public void removeClient(int connId) {
             synchronized (mClients) {
                 mClients.remove(connId);
+                int size = mClients.size();
+                for (int i = 0; i < size; i++) {
+                    IIjkMediaPlayer client = mClients.valueAt(i).get();
+                    if (client instanceof IjkMediaPlayerClient) {
+                        if (((IjkMediaPlayerClient)client).mBlocked) {
+                            BLog.e(TAG, "ANR happened, IjkMediaPlayerService will reboot");
+                            System.exit(0);
+                        }
+                    }
+                }
             }
         }
     };

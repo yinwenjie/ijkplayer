@@ -61,6 +61,7 @@ import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Map;
 
+import tv.danmaku.android.log.BLog;
 import tv.danmaku.ijk.media.player.misc.IMediaDataSource;
 import tv.danmaku.ijk.media.player.misc.ITrackInfo;
 import tv.danmaku.ijk.media.player.misc.IjkTrackInfo;
@@ -242,7 +243,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     }
                     break;
                 case DO_RELEASE:
-                    // player.handleRelease();
+                    player.handleRelease();
                     break;
                 case DO_PAUSE:
                     try {
@@ -1362,6 +1363,34 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         return 0;
     }
 
+    public void handleRelease() {
+        stayAwake(false);
+        updateSurfaceScreenOn();
+        mServiceIsConnected = false;
+        resetListeners();
+
+        mSomeWorkHandle.removeCallbacksAndMessages(null);
+
+        mWaitList.clear();
+        if (mPlayer != null) {
+            try {
+                mPlayer.release();
+                if (mService != null && mClient != null) {
+                    mService.removeClient(mClient.hashCode());
+                }
+            } catch (RemoteException e) {
+                onBuglyReport(e);
+            }
+        }
+
+        mHandleThread.quit();
+
+        mContext.unbindService(mIjkMediaPlayerServiceConnection);
+        mPlayer = null;
+        mIjkMediaPlayerServiceConnection = null;
+        mClient = null;
+    }
+
     /**
      * Releases resources associated with this IjkMediaPlayer object. It is
      * considered good practice to call this method when you're done using the
@@ -1380,33 +1409,48 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
      */
     @Override
     public void release() {
-        stayAwake(false);
-        updateSurfaceScreenOn();
         mPlayerAction = PLAYER_ACTION_IS_RELEASE;
-        mServiceIsConnected = false;
-        resetListeners();
-
-        mSomeWorkHandle.removeCallbacksAndMessages(null);
-        mHandleThread.quit();
-        try {
-            mHandleThread.join();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
-        mWaitList.clear();
-        if (mPlayer != null) {
+        stayAwake(false);
+        if (mPlayer != null && mServiceIsConnected) {
+            mSomeWorkHandle.obtainMessage(DO_RELEASE).sendToTarget();
             try {
-                mPlayer.release();
-                mService.removeClient(mClient.hashCode());
+                mPlayer.pause();
             } catch (RemoteException e) {
-                onBuglyReport(e);
+                e.printStackTrace();
+            }
+            stayAwake(false);
+        } else {
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    try {
+                        mPlayer.pause();
+                    } catch (RemoteException e) {
+                        e.printStackTrace();
+                    }
+                    mSomeWorkHandle.obtainMessage(DO_RELEASE).sendToTarget();
+                    return;
+                }
+                mWaitList.clear();
+                try {
+                    if (mService != null) {
+                        mService.removeClient(mClient.hashCode());
+                    }
+                } catch (RemoteException e) {
+                    e.printStackTrace();
+                }
+                if (mIjkMediaPlayerServiceConnection != null) {
+                    mContext.unbindService(mIjkMediaPlayerServiceConnection);
+                    mIjkMediaPlayerServiceConnection = null;
+                }
+                mSomeWorkHandle.removeCallbacksAndMessages(null);
+            }
+            mHandleThread.quit();
+            try {
+                mHandleThread.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
         }
-        mContext.unbindService(mIjkMediaPlayerServiceConnection);
-        mPlayer = null;
-        mIjkMediaPlayerServiceConnection = null;
-        mClient = null;
     }
 
     @Override
