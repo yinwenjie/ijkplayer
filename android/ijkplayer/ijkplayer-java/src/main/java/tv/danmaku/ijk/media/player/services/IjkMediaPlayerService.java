@@ -98,15 +98,22 @@ public class IjkMediaPlayerService extends Service {
         @Override
         public void removeClient(int connId) {
             synchronized (mClients) {
+                int blockCount = 0;
                 mClients.remove(connId);
                 int size = mClients.size();
                 for (int i = 0; i < size; i++) {
                     IIjkMediaPlayer client = mClients.valueAt(i).get();
                     if (client instanceof IjkMediaPlayerClient) {
                         if (((IjkMediaPlayerClient)client).mBlocked) {
-                            BLog.e(TAG, "ANR happened, IjkMediaPlayerService will reboot");
-                            System.exit(0);
+                            blockCount++;
                         }
+                    }
+                }
+                if (blockCount > 0) {
+                    BLog.w(TAG, "MediaPlayerService blockCount = " + blockCount);
+                    if (size == blockCount) {
+                        BLog.e(TAG, "ANR happened, IjkMediaPlayerService will reboot");
+                        System.exit(0);
                     }
                 }
             }
