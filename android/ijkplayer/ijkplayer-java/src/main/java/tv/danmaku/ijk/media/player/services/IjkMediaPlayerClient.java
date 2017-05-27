@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 
 import tv.danmaku.android.log.BLog;
+import tv.danmaku.android.log.LogPriority;
 import tv.danmaku.ijk.media.player.IIjkMediaPlayer;
 import tv.danmaku.ijk.media.player.IIjkMediaPlayerClient;
 import tv.danmaku.ijk.media.player.annotations.AccessedByNative;
@@ -45,6 +46,7 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
     private HandlerThread mHandlerThread = null;
     private Handler mProtectHandle = null;
     private IIjkMediaPlayerClient mClient = null;
+    private static final int MEDIA_BUFFERING_UPDATE = 3;
 
     private static final int MSG_NATIVE_PROTECT_CREATE               = 1;
     private static final int MSG_NATIVE_PROTECT_START                = 2;
@@ -308,6 +310,9 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
         IjkMediaPlayerClient ijkClient = (IjkMediaPlayerClient) ((WeakReference) weakThiz).get();
         if (ijkClient != null) {
             ijkClient.eventHandlerForClient(what, arg1, arg2);
+            if (what != MEDIA_BUFFERING_UPDATE) {
+                BLog.syncLog(LogPriority.INFO, "___FLUSH___LOG___");
+            }
         }
     }
 

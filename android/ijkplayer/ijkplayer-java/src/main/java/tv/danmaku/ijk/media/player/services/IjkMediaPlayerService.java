@@ -110,8 +110,8 @@ public class IjkMediaPlayerService extends Service {
                     }
                 }
                 if (blockCount > 0) {
-                    BLog.w(TAG, "MediaPlayerService blockCount = " + blockCount);
-                    if (size == blockCount) {
+                    BLog.w(TAG, "MediaPlayerService blockCount = " + blockCount + ",mClients.size = " + size);
+                    if (size == blockCount ||  blockCount >= 3) {
                         BLog.e(TAG, "ANR happened, IjkMediaPlayerService will reboot");
                         System.exit(0);
                     }
