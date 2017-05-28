@@ -152,6 +152,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
     //----------------------------------------
     // some work case
+    private static final int DO_CREATE               = 0;
     private static final int DO_PREPAREASYNC         = 1;
     private static final int DO_START                = 2;
     private static final int DO_RELEASE              = 3;
@@ -223,6 +224,18 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                 return;
             }
             switch (msg.what) {
+                case DO_CREATE:
+                    try {
+                        if (player.mService != null && player.mClient != null) {
+                            player.mPlayer = player.mService.create(player.mClient.hashCode(), player.mClient);
+                        } else {
+                            this.removeCallbacksAndMessages(null);
+                        }
+                    } catch (RemoteException e) {
+                        player.onBuglyReport(e);
+                        this.removeCallbacksAndMessages(null);
+                    }
+                    break;
                 case DO_PREPAREASYNC:
                     try {
                         if (player.mPlayer != null && player.mServiceIsConnected) {
@@ -438,6 +451,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                             player.mWaitList.clear();
                         }
                         player.mServiceIsConnected = true;
+                        if (player.mOnServiceIsConnectedListener != null)
+                            player.mOnServiceIsConnectedListener.onServiceIsConnected(true);
                     }
                     break;
                 case SERVICE_DISCONNECTED:
@@ -651,29 +666,25 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
+            BLog.i(TAG, "IjkMediaPlayer onServiceConnected\n");
+            if (mServiceIsConnected || mPlayerAction == PLAYER_ACTION_IS_RELEASE) {
+                return;
+            }
+
             mService = IIjkMediaPlayerService.Stub.asInterface(service);
-            try {
-                DebugLog.i(TAG, "IjkMediaPlayer onServiceConnected\n");
-                IjkMediaPlayer player = mWeakPlayer.get();
-                mPlayer = mService.create(mClient.hashCode(), mClient);
-                if (mOnServiceIsConnectedListener != null)
-                    mOnServiceIsConnectedListener.onServiceIsConnected(mServiceIsConnected);
-                if (player != null) {
-                    player.mSomeWorkHandle.obtainMessage(SERVICE_CONNECTED).sendToTarget();
-                }
-            } catch (RemoteException e) {
-                onBuglyReport(e);
+            IjkMediaPlayer player = mWeakPlayer.get();
+            mSomeWorkHandle.obtainMessage(DO_CREATE).sendToTarget();
+            if (player != null) {
+                player.mSomeWorkHandle.obtainMessage(SERVICE_CONNECTED).sendToTarget();
             }
         }
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
-            DebugLog.w(TAG, "IjkMediaPlayer onServiceDisconnected\n");
+            BLog.i(TAG, "IjkMediaPlayer onServiceDisconnected\n");
             mServiceIsConnected = false;
-            mService = null;
-            mPlayer = null;
             if (mOnServiceIsConnectedListener != null)
-                mOnServiceIsConnectedListener.onServiceIsConnected(mServiceIsConnected);
+                mOnServiceIsConnectedListener.onServiceIsConnected(false);
             if (mPlayerAction != PLAYER_ACTION_IS_RELEASE) {
                 serviceDisConnectedHandle();
             }
@@ -707,12 +718,26 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
      * </p>
      */
     public IjkMediaPlayer(IjkLibLoader libLoader, Context context) {
+        BLog.i(TAG, "IjkMediaPlayer create\n");
         mServiceIsConnected = false;
         mPlayerAction = PLAYER_ACTION_IS_INIT;
         mContext = context;
 
         mClient = new IjkMediaPlayerBinder(this);
         mIjkMediaPlayerServiceConnection = new IjkMediaPlayerServiceConnection(this);
+
+        Looper looper;
+        if ((looper = Looper.myLooper()) != null) {
+            mEventHandler = new IjkMediaPlayer.EventHandler(this, looper);
+        } else if ((looper = Looper.getMainLooper()) != null) {
+            mEventHandler = new IjkMediaPlayer.EventHandler(this, looper);
+        } else {
+            mEventHandler = null;
+        }
+
+        mHandleThread = new HandlerThread("IjkMediaPlayer:Handler");
+        mHandleThread.start();
+        mSomeWorkHandle = new SomeWorkHandler(this, mHandleThread.getLooper());
 
         Intent intent = new Intent(mContext, IjkMediaPlayerService.class);
         Bundle bundle = new Bundle();
@@ -732,19 +757,6 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         }
         intent.putExtras(bundle);
         mContext.bindService(intent, mIjkMediaPlayerServiceConnection, Context.BIND_AUTO_CREATE);
-
-        Looper looper;
-        if ((looper = Looper.myLooper()) != null) {
-            mEventHandler = new IjkMediaPlayer.EventHandler(this, looper);
-        } else if ((looper = Looper.getMainLooper()) != null) {
-            mEventHandler = new IjkMediaPlayer.EventHandler(this, looper);
-        } else {
-            mEventHandler = null;
-        }
-        mHandleThread = new HandlerThread("IjkMediaPlayer:Handler");
-        mHandleThread.start();
-        mSomeWorkHandle = new SomeWorkHandler(this, mHandleThread.getLooper());
-        DebugLog.w(TAG, "IjkMediaPlayer create\n");
     }
 
     /**
@@ -757,15 +769,13 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
      * </p>
      */
     public IjkMediaPlayer(Context context) {
+        BLog.i(TAG, "IjkMediaPlayer create\n");
         mServiceIsConnected = false;
         mPlayerAction = PLAYER_ACTION_IS_INIT;
         mContext = context;
 
         mClient = new IjkMediaPlayerBinder(this);
         mIjkMediaPlayerServiceConnection = new IjkMediaPlayerServiceConnection(this);
-
-        Intent intent = new Intent(mContext, IjkMediaPlayerService.class);
-        mContext.bindService(intent, mIjkMediaPlayerServiceConnection, Context.BIND_AUTO_CREATE);
 
         Looper looper;
         if ((looper = Looper.myLooper()) != null) {
@@ -777,8 +787,10 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         }
         mHandleThread = new HandlerThread("IjkMediaPlayer:Handler");
         mHandleThread.start();
+
         mSomeWorkHandle = new SomeWorkHandler(this, mHandleThread.getLooper());
-        DebugLog.w(TAG, "IjkMediaPlayer create\n");
+        Intent intent = new Intent(mContext, IjkMediaPlayerService.class);
+        mContext.bindService(intent, mIjkMediaPlayerServiceConnection, Context.BIND_AUTO_CREATE);
     }
 
     private void onBuglyReport(Exception e) {
@@ -1370,8 +1382,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         resetListeners();
 
         mSomeWorkHandle.removeCallbacksAndMessages(null);
-
-        mWaitList.clear();
+        synchronized (mWaitList) {
+            mWaitList.clear();
+        }
         if (mPlayer != null) {
             try {
                 mPlayer.release();
@@ -1386,9 +1399,6 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         mHandleThread.quit();
 
         mContext.unbindService(mIjkMediaPlayerServiceConnection);
-        mPlayer = null;
-        mIjkMediaPlayerServiceConnection = null;
-        mClient = null;
     }
 
     /**
@@ -1412,13 +1422,12 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         mPlayerAction = PLAYER_ACTION_IS_RELEASE;
         stayAwake(false);
         if (mPlayer != null && mServiceIsConnected) {
-            mSomeWorkHandle.obtainMessage(DO_RELEASE).sendToTarget();
             try {
                 mPlayer.pause();
             } catch (RemoteException e) {
                 e.printStackTrace();
             }
-            stayAwake(false);
+            mSomeWorkHandle.obtainMessage(DO_RELEASE).sendToTarget();
         } else {
             synchronized (mWaitList) {
                 if (mPlayer != null && mServiceIsConnected) {
@@ -1430,13 +1439,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     mSomeWorkHandle.obtainMessage(DO_RELEASE).sendToTarget();
                     return;
                 }
-                mWaitList.clear();
-                try {
-                    if (mService != null) {
-                        mService.removeClient(mClient.hashCode());
-                    }
-                } catch (RemoteException e) {
-                    e.printStackTrace();
+                synchronized (mWaitList) {
+                    mWaitList.clear();
                 }
                 if (mIjkMediaPlayerServiceConnection != null) {
                     mContext.unbindService(mIjkMediaPlayerServiceConnection);
