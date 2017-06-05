@@ -181,6 +181,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     private static final int SERVICE_DISCONNECTED    = 26;
     private static final int DO_SETANDROIDIOCALLBACK = 27;
     private static final int NOTIFY_ONNATIVEINVOKE   = 28;
+    private static final int DO_INJECTCACHENODE      = 29;
 
     private SurfaceHolder mSurfaceHolder;
     private PowerManager.WakeLock mWakeLock = null;
@@ -469,6 +470,16 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                 case NOTIFY_ONNATIVEINVOKE:
                     if (player.mOnNativeInvokeListener != null) {
                         player.mOnNativeInvokeListener.onNativeInvoke(msg.arg1, (Bundle)msg.obj);
+                    }
+                    break;
+                case DO_INJECTCACHENODE:
+                    try {
+                        if (player.mPlayer != null && player.mServiceIsConnected) {
+                            long[] node = (long[]) msg.obj;
+                            player.mPlayer.injectCacheNode((int)node[0], node[1], node[2], node[3], node[4]);
+                        }
+                    } catch (RemoteException e) {
+                        player.onBuglyReport(e);
                     }
                     break;
                 default:
@@ -2132,6 +2143,21 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     mSomeWorkHandle.obtainMessage(DO_NATIVESETLOGLEVEL, level, 0).sendToTarget();
                 } else {
                     mWaitList.add(mSomeWorkHandle.obtainMessage(DO_NATIVESETLOGLEVEL, level, 0));
+                }
+            }
+        }
+    }
+
+    public void injectCacheNode(int index, long fileLogicalPos, long physicalPos, long cacheSize, long fileSize) {
+        long[] node = new long[]{(long)index, fileLogicalPos, physicalPos, cacheSize, fileSize};
+        if (mPlayer != null && mServiceIsConnected) {
+            mSomeWorkHandle.obtainMessage(DO_INJECTCACHENODE, node).sendToTarget();
+        } else {
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_INJECTCACHENODE, node).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_INJECTCACHENODE, node));
                 }
             }
         }

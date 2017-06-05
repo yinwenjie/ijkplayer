@@ -84,6 +84,7 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
     private static final int MSG_NATIVE_PROTECT_NATIVEPROFILEEND     = 34;
     private static final int MSG_NATIVE_PROTECT_NATIVESETLOGLEVEL    = 35;
     private static final int MSG_NATIVE_PROTECT_SETANDROIDIOCALLBACK = 36;
+    private static final int MSG_NATIVE_PROTECT_INJECTCACHENODE      = 37;
 
 
 
@@ -179,6 +180,8 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
             throws IllegalStateException;
 
     private native Bundle _getMediaMeta();
+
+    private native void _injectCacheNode(int index, long fileLogicalPos, long physicalPos, long cacheSize, long fileSize);
 
     public static native String _getColorFormatName(int mediaCodecColorFormat);
 
@@ -660,5 +663,12 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
         mProtectHandle.sendEmptyMessageDelayed(MSG_NATIVE_PROTECT_NATIVESETLOGLEVEL, PROTECT_DELAY);
         _native_setLogLevel(level);
         mProtectHandle.removeMessages(MSG_NATIVE_PROTECT_NATIVESETLOGLEVEL);
+    }
+
+    @Override
+    public void injectCacheNode(int index, long fileLogicalPos, long physicalPos, long cacheSize, long fileSize) {
+        mProtectHandle.sendEmptyMessageDelayed(MSG_NATIVE_PROTECT_INJECTCACHENODE, PROTECT_DELAY);
+        _injectCacheNode(index, fileLogicalPos, physicalPos, cacheSize, fileSize);
+        mProtectHandle.removeMessages(MSG_NATIVE_PROTECT_INJECTCACHENODE);
     }
 }
