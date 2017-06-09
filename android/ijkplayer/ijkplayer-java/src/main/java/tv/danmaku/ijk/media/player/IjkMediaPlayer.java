@@ -1387,8 +1387,6 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public void handleRelease() {
-        stayAwake(false);
-        updateSurfaceScreenOn();
         mServiceIsConnected = false;
         resetListeners();
 
@@ -1412,6 +1410,37 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         mContext.unbindService(mIjkMediaPlayerServiceConnection);
     }
 
+    public void syncRelease() {
+        stayAwake(false);
+        mPlayerAction = PLAYER_ACTION_IS_RELEASE;
+        mServiceIsConnected = false;
+        resetListeners();
+
+        synchronized (mWaitList) {
+            mSomeWorkHandle.removeCallbacksAndMessages(null);
+            mHandleThread.quit();
+            mWaitList.clear();
+        }
+        try {
+            mHandleThread.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        if (mPlayer != null) {
+            try {
+                mPlayer.pause();
+                mPlayer.release();
+                if (mService != null && mClient != null) {
+                    mService.removeClient(mClient.hashCode());
+                }
+            } catch (RemoteException e) {
+                onBuglyReport(e);
+            }
+        }
+        mContext.unbindService(mIjkMediaPlayerServiceConnection);
+    }
+
     /**
      * Releases resources associated with this IjkMediaPlayer object. It is
      * considered good practice to call this method when you're done using the
@@ -1430,6 +1459,10 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
      */
     @Override
     public void release() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            syncRelease();
+            return;
+        }
         mPlayerAction = PLAYER_ACTION_IS_RELEASE;
         stayAwake(false);
         if (mPlayer != null && mServiceIsConnected) {
@@ -1468,19 +1501,27 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         }
     }
 
+    public void syncReset() {
+        synchronized (mWaitList) {
+            mSomeWorkHandle.removeCallbacksAndMessages(null);
+            mWaitList.clear();
+        }
+        try {
+            if (mPlayer != null && mServiceIsConnected) {
+                mPlayer.pause();
+                mPlayer.reset();
+                stayAwake(false);
+            }
+        } catch (RemoteException e) {
+            onBuglyReport(e);
+        }
+        mVideoWidth  = 0;
+        mVideoHeight = 0;
+    }
+
     @Override
     public void reset() {
-        if (mPlayer != null && mServiceIsConnected) {
-            mSomeWorkHandle.obtainMessage(DO_RESET).sendToTarget();
-        } else {
-            synchronized (mWaitList) {
-                if (mPlayer != null && mServiceIsConnected) {
-                    mSomeWorkHandle.obtainMessage(DO_RESET).sendToTarget();
-                } else {
-                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_RESET));
-                }
-            }
-        }
+        syncReset();
     }
 
     /**

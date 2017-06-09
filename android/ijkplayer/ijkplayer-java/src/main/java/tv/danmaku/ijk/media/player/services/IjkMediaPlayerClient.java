@@ -18,6 +18,7 @@
 
 package tv.danmaku.ijk.media.player.services;
 
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -208,6 +209,10 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
                             } catch (RemoteException e) {
                                 e.printStackTrace();
                             }
+                        }
+                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+                            BLog.e(TAG, "ANR happened, IjkMediaPlayerService will reboot");
+                            System.exit(0);
                         }
                         break;
                     default:
