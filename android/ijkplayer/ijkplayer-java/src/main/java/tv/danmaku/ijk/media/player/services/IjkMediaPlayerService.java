@@ -35,7 +35,6 @@ import tv.danmaku.ijk.media.player.IjkLibLoader;
 
 public class IjkMediaPlayerService extends Service {
     private static final String TAG = "IjkMediaPlayerService";
-    private Bundle mLibBundle;
     private final SparseArray<WeakReference<IIjkMediaPlayer>> mClients = new SparseArray<>();
 
     /**
@@ -78,7 +77,6 @@ public class IjkMediaPlayerService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        loadLibrariesOnce(mLibBundle);
     }
 
     IIjkMediaPlayerService.Stub mBinder = new IIjkMediaPlayerService.Stub() {
@@ -122,13 +120,15 @@ public class IjkMediaPlayerService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-        mLibBundle = intent.getExtras();
+        Bundle bundle = intent.getExtras();
+        loadLibrariesOnce(bundle);
         return mBinder;
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        mLibBundle = intent.getExtras();
+        Bundle bundle = intent.getExtras();
+        loadLibrariesOnce(bundle);
         return START_NOT_STICKY;
     }
 
