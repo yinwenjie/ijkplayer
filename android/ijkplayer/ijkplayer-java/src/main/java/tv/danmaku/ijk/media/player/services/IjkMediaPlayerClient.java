@@ -29,6 +29,8 @@ import android.view.Surface;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import tv.danmaku.android.log.BLog;
 import tv.danmaku.android.log.LogPriority;
@@ -48,6 +50,9 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
     private Handler mProtectHandle = null;
     private IIjkMediaPlayerClient mClient = null;
     private static final int MEDIA_BUFFERING_UPDATE = 3;
+    private IjkMediaPlayerService.IjkMediaPlayerDeathHandler mClientDeathHandler = null;
+    private int mRelease = 0;
+    private Lock mLock = new ReentrantLock();
 
     private static final int MSG_NATIVE_PROTECT_CREATE               = 1;
     private static final int MSG_NATIVE_PROTECT_START                = 2;
@@ -233,6 +238,23 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
         _native_setup(new WeakReference<IjkMediaPlayerClient>(this));
     }
 
+    public void linkDeathHandler(IjkMediaPlayerService.IjkMediaPlayerDeathHandler handler) {
+        mClientDeathHandler = handler;
+        if (mClientDeathHandler != null && mClient != null) {
+            try {
+                mClient.asBinder().linkToDeath(mClientDeathHandler, 0);
+            } catch (RemoteException e) {
+                BLog.i(TAG, "IjkMediaPlayerClient linkToDeath fail");
+            }
+        }
+    }
+
+    public void unlinkDeathHandler() {
+        if (mClientDeathHandler != null && mClient != null) {
+            mClient.asBinder().unlinkToDeath(mClientDeathHandler, 0);
+        }
+    }
+
     @CalledByNative
     private static boolean onNativeInvoke(Object weakThiz, int what, Bundle args) {
         DebugLog.ifmt(TAG, "onNativeInvoke %d", what);
@@ -367,12 +389,40 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
         mProtectHandle.removeMessages(MSG_NATIVE_PROTECT_STOP);
     }
 
+    public void clientDeathHandle() {
+        if (mLock.tryLock()) {
+            if (mRelease > 0) {
+                mLock.unlock();
+                return;
+            }
+            mRelease = 1;
+            mProtectHandle.sendEmptyMessageDelayed(MSG_NATIVE_PROTECT_RELEASE, PROTECT_DELAY);
+            try {
+                _pause();
+            } catch (IllegalStateException e) {
+                e.printStackTrace();
+            }
+            _release();
+            mBlocked = false;
+            mProtectHandle.removeMessages(MSG_NATIVE_PROTECT_RELEASE);
+            mLock.unlock();
+        }
+    }
+
     @Override
     public void release() {
-        mProtectHandle.sendEmptyMessageDelayed(MSG_NATIVE_PROTECT_RELEASE, PROTECT_DELAY);
-        _release();
-        mBlocked = false;
-        mProtectHandle.removeMessages(MSG_NATIVE_PROTECT_RELEASE);
+        if (mLock.tryLock()) {
+            if (mRelease > 0) {
+                mLock.unlock();
+                return;
+            }
+            mRelease = 1;
+            mProtectHandle.sendEmptyMessageDelayed(MSG_NATIVE_PROTECT_RELEASE, PROTECT_DELAY);
+            _release();
+            mBlocked = false;
+            mProtectHandle.removeMessages(MSG_NATIVE_PROTECT_RELEASE);
+            mLock.unlock();
+        }
     }
 
     @Override

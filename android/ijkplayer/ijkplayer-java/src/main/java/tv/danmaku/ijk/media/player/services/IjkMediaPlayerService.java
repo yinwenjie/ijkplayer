@@ -23,6 +23,7 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.RemoteException;
 import android.util.SparseArray;
 import java.io.File;
 import java.lang.ref.WeakReference;
@@ -79,31 +80,67 @@ public class IjkMediaPlayerService extends Service {
         super.onCreate();
     }
 
+    public class IjkMediaPlayerDeathHandler implements IBinder.DeathRecipient {
+        private int mConnId;
+        public IjkMediaPlayerDeathHandler(int connId) {
+            mConnId = connId;
+        }
+
+        @Override
+        public void binderDied() {
+            synchronized (mClients) {
+                WeakReference<IIjkMediaPlayer> v = mClients.get(mConnId);
+                if (v != null) {
+                    IIjkMediaPlayer iIjkMediaPlayer = v.get();
+                    if (iIjkMediaPlayer != null) {
+                        if (iIjkMediaPlayer instanceof IjkMediaPlayerClient) {
+                            ((IjkMediaPlayerClient) iIjkMediaPlayer).unlinkDeathHandler();
+                            ((IjkMediaPlayerClient) iIjkMediaPlayer).clientDeathHandle();
+                        }
+                    }
+                    mClients.remove(mConnId);
+                }
+            }
+        }
+    }
+
     IIjkMediaPlayerService.Stub mBinder = new IIjkMediaPlayerService.Stub() {
         @Override
         public IIjkMediaPlayer create(int connId, IIjkMediaPlayerClient client) {
             synchronized (mClients) {
-                if (mClients != null) {
-                    IjkMediaPlayerClient c = new IjkMediaPlayerClient(client);
-                    mClients.put(connId, new WeakReference<IIjkMediaPlayer>(c));
-                    BLog.i(TAG, "IIjkMediaPlayerService create mClients.size() = " + mClients.size());
-                    return c;
-                }
+                IjkMediaPlayerClient c = new IjkMediaPlayerClient(client);
+                c.linkDeathHandler(new IjkMediaPlayerDeathHandler(connId));
+                mClients.put(connId, new WeakReference<IIjkMediaPlayer>(c));
+                BLog.i(TAG, "IIjkMediaPlayerService create mClients.size() = " + mClients.size());
+                return c;
             }
-            return null;
         }
 
         @Override
         public void removeClient(int connId) {
             synchronized (mClients) {
                 int blockCount = 0;
+                WeakReference<IIjkMediaPlayer> v = mClients.get(connId);
                 mClients.remove(connId);
+
+                if (v != null) {
+                    IIjkMediaPlayer iIjkMediaPlayer = v.get();
+                    if (iIjkMediaPlayer != null) {
+                        if (iIjkMediaPlayer instanceof IjkMediaPlayerClient) {
+                            ((IjkMediaPlayerClient)iIjkMediaPlayer).unlinkDeathHandler();
+                        }
+                    }
+                }
+
                 int size = mClients.size();
                 for (int i = 0; i < size; i++) {
-                    IIjkMediaPlayer client = mClients.valueAt(i).get();
-                    if (client instanceof IjkMediaPlayerClient) {
-                        if (((IjkMediaPlayerClient)client).mBlocked) {
-                            blockCount++;
+                    WeakReference<IIjkMediaPlayer> value = mClients.valueAt(i);
+                    if (value != null) {
+                        IIjkMediaPlayer client = value.get();
+                        if (client instanceof IjkMediaPlayerClient) {
+                            if (((IjkMediaPlayerClient)client).mBlocked) {
+                                blockCount++;
+                            }
                         }
                     }
                 }
