@@ -554,11 +554,6 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     return;
 
                 case MEDIA_INFO:
-                    switch (msg.arg1) {
-                        case MEDIA_INFO_VIDEO_RENDERING_START:
-                            DebugLog.i(TAG, "Info: MEDIA_INFO_VIDEO_RENDERING_START\n");
-                            break;
-                    }
                     player.notifyOnInfo(msg.arg1, msg.arg2);
                     // No real default action so far.
                     return;
@@ -654,8 +649,12 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                 player.start();
             }
             if (player.mEventHandler != null) {
-                Message m = player.mEventHandler.obtainMessage(what, arg1, arg2);
-                player.mEventHandler.sendMessage(m);
+                if (what == MEDIA_INFO && arg1 == MEDIA_INFO_VIDEO_RENDERING_START) {
+                    player.notifyOnInfo(arg1, arg2);
+                } else {
+                    Message m = player.mEventHandler.obtainMessage(what, arg1, arg2);
+                    player.mEventHandler.sendMessage(m);
+                }
             }
         }
 
