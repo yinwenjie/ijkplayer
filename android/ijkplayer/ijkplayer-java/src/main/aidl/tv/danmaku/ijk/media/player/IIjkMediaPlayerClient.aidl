@@ -21,6 +21,6 @@ package tv.danmaku.ijk.media.player;
 interface IIjkMediaPlayerClient {
     String onMediaCodecSelect(String mimeType, int profile, int level);
     boolean onNativeInvoke(int what, inout Bundle args);
-    void onEventHandler(int what, int arg1, int arg2);
+    void onEventHandler(int what, int arg1, int arg2, String str);
     void onReportAnr(int what);
 }

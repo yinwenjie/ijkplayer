@@ -50,6 +50,7 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
     private Handler mProtectHandle = null;
     private IIjkMediaPlayerClient mClient = null;
     private static final int MEDIA_BUFFERING_UPDATE = 3;
+    private static final int MEDIA_GET_IMG_STATE = 6;
     private IjkMediaPlayerService.IjkMediaPlayerDeathHandler mClientDeathHandler = null;
     private int mRelease = 0;
     private Lock mLock = new ReentrantLock();
@@ -91,6 +92,7 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
     private static final int MSG_NATIVE_PROTECT_NATIVESETLOGLEVEL    = 35;
     private static final int MSG_NATIVE_PROTECT_SETANDROIDIOCALLBACK = 36;
     private static final int MSG_NATIVE_PROTECT_INJECTCACHENODE      = 37;
+    private static final int MSG_NATIVE_PROTECT_SETFRAMEATTIME       = 38;
 
 
 
@@ -188,6 +190,9 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
     private native Bundle _getMediaMeta();
 
     private native void _injectCacheNode(int index, long fileLogicalPos, long physicalPos, long cacheSize, long fileSize);
+
+    private native void _setFrameAtTime(String imgCachePath, long startTime, long endTime, int num, int imgDefinition)
+            throws IllegalArgumentException, IllegalStateException;
 
     public static native String _getColorFormatName(int mediaCodecColorFormat);
 
@@ -339,17 +344,21 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
         @SuppressWarnings("rawtypes")
         IjkMediaPlayerClient ijkClient = (IjkMediaPlayerClient) ((WeakReference) weakThiz).get();
         if (ijkClient != null) {
-            ijkClient.eventHandlerForClient(what, arg1, arg2);
-            if (what != MEDIA_BUFFERING_UPDATE) {
-                BLog.syncLog(LogPriority.INFO, "___FLUSH___LOG___");
+            if (what == MEDIA_GET_IMG_STATE) {
+                ijkClient.eventHandlerForClient(what, arg1, arg2, (String) obj);
+            } else {
+                ijkClient.eventHandlerForClient(what, arg1, arg2, null);
+                if (what != MEDIA_BUFFERING_UPDATE) {
+                    BLog.syncLog(LogPriority.INFO, "___FLUSH___LOG___");
+                }
             }
         }
     }
 
-    private void eventHandlerForClient(int what, int arg1, int arg2) {
+    private void eventHandlerForClient(int what, int arg1, int arg2, String str) {
         if (mClient != null) {
             try {
-                mClient.onEventHandler(what, arg1, arg2);
+                mClient.onEventHandler(what, arg1, arg2, str);
             } catch (RemoteException e) {
                 e.printStackTrace();
             }
@@ -725,5 +734,15 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
         mProtectHandle.sendEmptyMessageDelayed(MSG_NATIVE_PROTECT_INJECTCACHENODE, PROTECT_DELAY);
         _injectCacheNode(index, fileLogicalPos, physicalPos, cacheSize, fileSize);
         mProtectHandle.removeMessages(MSG_NATIVE_PROTECT_INJECTCACHENODE);
+    }
+
+    @Override
+    public void setFrameAtTime(String imgCachePath, long startTime, long endTime, int num, int imgDefinition) {
+        mProtectHandle.sendEmptyMessageDelayed(MSG_NATIVE_PROTECT_SETFRAMEATTIME, PROTECT_DELAY);
+        try {
+            _setFrameAtTime(imgCachePath, startTime, endTime, num, imgDefinition);
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+        }
+        mProtectHandle.removeMessages(MSG_NATIVE_PROTECT_SETFRAMEATTIME);
     }
 }

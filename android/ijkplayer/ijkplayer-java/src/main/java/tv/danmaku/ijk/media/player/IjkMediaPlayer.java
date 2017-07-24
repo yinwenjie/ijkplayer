@@ -638,7 +638,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         }
 
         @Override
-        public void onEventHandler(int what, int arg1, int arg2) throws RemoteException {
+        public void onEventHandler(int what, int arg1, int arg2, String str) throws RemoteException {
             IjkMediaPlayer player = mWeakPlayer.get();
             if (player == null) {
                 return;

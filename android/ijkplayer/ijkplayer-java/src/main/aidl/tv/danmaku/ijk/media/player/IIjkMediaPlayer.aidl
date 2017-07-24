@@ -58,4 +58,5 @@ interface IIjkMediaPlayer {
     void setAndroidIOCallback();
     long getAndroidIOTrafficStatistic();
     void injectCacheNode(int index, long fileLogicalPos, long physicalPos, long cacheSize, long fileSize);
+    void setFrameAtTime(String imgCachePath, long startTime, long endTime, int num, int imgDefinition);
 }
