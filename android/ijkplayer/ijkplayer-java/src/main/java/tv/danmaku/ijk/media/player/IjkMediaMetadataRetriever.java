@@ -148,12 +148,13 @@ public final class IjkMediaMetadataRetriever {
                             player.mPlayer.setOptionLong(OPT_CATEGORY_FORMAT, "dns_cache", 1);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_FORMAT, "dns_cache_timeout", 2 * 60 * 60 * 1000);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_FORMAT, "safe", 0);
-                            player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "skip-calc-frame-rate", 0);
+                            player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "skip-calc-frame-rate", 1);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "min-frames", 480);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "start-on-prepared", 0);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "an", 1);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "mediacodec", 0);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "get-frame-mode", 1);
+                            player.mPlayer.setOptionString(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "protocol_whitelist", "ijkio,async,cache,crypto,file,http,https,ijkhttphook,ijkinject,ijklivehook,ijklongurl,ijksegment,ijktcphook,pipe,rtp,tcp,tls,udp,ijkurlhook,data");
                         } else {
                             this.removeCallbacksAndMessages(null);
                         }
@@ -301,37 +302,21 @@ public final class IjkMediaMetadataRetriever {
 
         @Override
         public boolean onNativeInvoke(int what, Bundle args) {
-            if (what == OnNativeInvokeListener.EVENT_WILL_HTTP_OPEN ||
-                    what == OnNativeInvokeListener.EVENT_WILL_HTTP_SEEK ||
-                    what == OnNativeInvokeListener.EVENT_DID_HTTP_SEEK ||
-                    what == OnNativeInvokeListener.EVENT_DID_HTTP_OPEN) {
-                    return true;
-            }
-
-            IjkMediaMetadataRetriever player = mWeakPlayer.get();
-            if (player == null) {
-                return false;
-            }
             switch (what) {
-                case IjkMediaMetadataRetriever.OnNativeInvokeListener.CTRL_WILL_CONCAT_RESOLVE_SEGMENT: {
-                    IjkMediaMetadataRetriever.OnControlMessageListener onControlMessageListener = player.mOnControlMessageListener;
-                    if (onControlMessageListener == null)
-                        return false;
-
-                    int segmentIndex = args.getInt(IjkMediaPlayer.OnNativeInvokeListener.ARG_SEGMENT_INDEX, -1);
-                    if (segmentIndex < 0)
-                        throw new InvalidParameterException("onNativeInvoke(invalid segment index)");
-
-                    String newUrl = onControlMessageListener.onControlResolveSegmentUrl(segmentIndex);
-                    if (newUrl == null)
-                        throw new RuntimeException(new IOException("onNativeInvoke() = <NULL newUrl>"));
-
-                    args.putString(IjkMediaPlayer.OnNativeInvokeListener.ARG_URL, newUrl);
-                    return true;
+                case OnNativeInvokeListener.EVENT_WILL_HTTP_OPEN:
+                case OnNativeInvokeListener.EVENT_WILL_HTTP_SEEK:
+                case OnNativeInvokeListener.EVENT_DID_HTTP_SEEK:
+                case OnNativeInvokeListener.EVENT_DID_HTTP_OPEN:
+                    mSomeWorkHandle.obtainMessage(NOTIFY_ONNATIVEINVOKE, what, 0, args).sendToTarget();
+                    break;
+                default: {
+                    if (mOnNativeInvokeListener != null) {
+                        mOnNativeInvokeListener.onNativeInvoke(what, args);
+                    }
+                    break;
                 }
-                default:
-                    return false;
             }
+            return true;
         }
 
         @Override
