@@ -138,7 +138,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     public static final int FFP_PROP_INT64_ASYNC_STATISTIC_BUF_CAPACITY     = 20203;
     public static final int FFP_PROP_INT64_TRAFFIC_STATISTIC_BYTE_COUNT     = 20204;
     public static final int FFP_PROP_INT64_CACHE_STATISTIC_PHYSICAL_POS     = 20205;
-    public static final int FFP_PROP_INT64_CACHE_STATISTIC_BUF_FORWARDS     = 20206;
+    public static final int FFP_PROP_INT64_CACHE_STATISTIC_FILE_FORWARDS    = 20206;
     public static final int FFP_PROP_INT64_CACHE_STATISTIC_FILE_POS         = 20207;
     public static final int FFP_PROP_INT64_CACHE_STATISTIC_COUNT_BYTES      = 20208;
     public static final int FFP_PROP_INT64_BIT_RATE                         = 20100;
@@ -1754,10 +1754,10 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         return 0;
     }
 
-    public long getCacheStatisticBufForwards() {
+    public long getCacheStatisticFileForwards() {
         if (mPlayer != null && mServiceIsConnected) {
             try {
-                return mPlayer.getPropertyLong(FFP_PROP_INT64_CACHE_STATISTIC_BUF_FORWARDS, 0);
+                return mPlayer.getPropertyLong(FFP_PROP_INT64_CACHE_STATISTIC_FILE_FORWARDS, 0);
             } catch (RemoteException e) {
                 onBuglyReport(e);
             }
