@@ -110,9 +110,6 @@ public final class IjkMediaMetadataRetriever {
     private SomeWorkHandler mSomeWorkHandle;
     private final ArrayList<Message> mWaitList = new ArrayList<>();
     private boolean mHappenAnr = false;
-    private boolean mIsPrepared = false;
-    private boolean mNeedStart = false;
-    private final Object mLock = new Object();
 
     private long      mStartTime = 0;
     private long        mEndTime = 0;
@@ -150,7 +147,7 @@ public final class IjkMediaMetadataRetriever {
                             player.mPlayer.setOptionLong(OPT_CATEGORY_FORMAT, "safe", 0);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "skip-calc-frame-rate", 1);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "min-frames", 480);
-                            player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "start-on-prepared", 0);
+                            player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "start-on-prepared", 1);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "an", 1);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "mediacodec", 0);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "get-frame-mode", 1);
@@ -327,13 +324,7 @@ public final class IjkMediaMetadataRetriever {
             }
             switch (what) {
                 case MEDIA_PREPARED:
-                    synchronized (mLock) {
-                        if (mNeedStart) {
-                            startGetFrame(mStartTime);
-                        }
-                        mNeedStart = false;
-                        mIsPrepared = true;
-                    }
+                    seekTo(mStartTime);
                     return;
                 case MEDIA_ERROR:
                     if (mOnFrameGenerateListener != null)
@@ -592,7 +583,6 @@ public final class IjkMediaMetadataRetriever {
                 }
             }
         }
-        prepareAsync();
     }
 
     public void setDataSourceBase64(String path) {
@@ -608,7 +598,6 @@ public final class IjkMediaMetadataRetriever {
                 }
             }
         }
-        prepareAsync();
     }
 
     /**
@@ -657,7 +646,6 @@ public final class IjkMediaMetadataRetriever {
                 }
             }
         }
-        prepareAsync();
     }
 
     /**
@@ -835,29 +823,8 @@ public final class IjkMediaMetadataRetriever {
         }
     }
 
-    private void startGetFrame(long pos) {
-        seekTo(pos);
-        if (mPlayer != null && mServiceIsConnected) {
-            mSomeWorkHandle.obtainMessage(DO_START).sendToTarget();
-        } else {
-            synchronized (mWaitList) {
-                if (mPlayer != null && mServiceIsConnected) {
-                    mSomeWorkHandle.obtainMessage(DO_START).sendToTarget();
-                } else {
-                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_START));
-                }
-            }
-        }
-    }
-
     public void start() {
-        synchronized (mLock) {
-            if (mIsPrepared) {
-                startGetFrame(mStartTime);
-            } else {
-                mNeedStart = true;
-            }
-        }
+        prepareAsync();
     }
 
     public void setOption(int category, String name, String value)
