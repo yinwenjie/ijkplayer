@@ -720,36 +720,6 @@ public final class IjkMediaMetadataRetriever {
         mContext.unbindService(mIjkMediaPlayerServiceConnection);
     }
 
-    public void syncRelease() {
-        mPlayerAction = PLAYER_ACTION_IS_RELEASE;
-        mServiceIsConnected = false;
-        resetListeners();
-
-        synchronized (mWaitList) {
-            mSomeWorkHandle.removeCallbacksAndMessages(null);
-            mHandleThread.quit();
-            mWaitList.clear();
-        }
-        try {
-            mHandleThread.join();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
-        if (mPlayer != null) {
-            try {
-                mPlayer.pause();
-                mPlayer.release();
-                if (mService != null && mClient != null) {
-                    mService.removeClient(mClient.hashCode());
-                }
-            } catch (RemoteException e) {
-                onBuglyReport(e);
-            }
-        }
-        mContext.unbindService(mIjkMediaPlayerServiceConnection);
-    }
-
     /**
      * Releases resources associated with this IjkMediaPlayer object. It is
      * considered good practice to call this method when you're done using the
@@ -767,10 +737,6 @@ public final class IjkMediaMetadataRetriever {
      * multiple instances are used at the same time.
      */
     public void release() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
-            syncRelease();
-            return;
-        }
         mPlayerAction = PLAYER_ACTION_IS_RELEASE;
         if (mPlayer != null && mServiceIsConnected) {
             try {
