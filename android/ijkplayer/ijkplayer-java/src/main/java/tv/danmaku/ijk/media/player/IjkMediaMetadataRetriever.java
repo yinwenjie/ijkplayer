@@ -142,7 +142,6 @@ public final class IjkMediaMetadataRetriever {
                             player.mPlayer.setOptionLong(OPT_CATEGORY_FORMAT, "timeout", 2000000);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_FORMAT, "connect_timeout", 15000000);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_FORMAT, "reconnect", 1);
-                            player.mPlayer.setOptionLong(OPT_CATEGORY_FORMAT, "dns_cache", 1);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_FORMAT, "dns_cache_timeout", 2 * 60 * 60 * 1000);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_FORMAT, "safe", 0);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "skip-calc-frame-rate", 1);
@@ -324,7 +323,6 @@ public final class IjkMediaMetadataRetriever {
             }
             switch (what) {
                 case MEDIA_PREPARED:
-                    seekTo(mStartTime);
                     return;
                 case MEDIA_ERROR:
                     if (mOnFrameGenerateListener != null)
@@ -790,6 +788,7 @@ public final class IjkMediaMetadataRetriever {
     }
 
     public void start() {
+        setOption(OPT_CATEGORY_PLAYER, "seek-at-start", mStartTime);
         prepareAsync();
     }
 
