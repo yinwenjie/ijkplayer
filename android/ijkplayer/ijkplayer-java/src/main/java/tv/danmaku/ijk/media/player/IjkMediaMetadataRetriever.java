@@ -715,7 +715,14 @@ public final class IjkMediaMetadataRetriever {
 
         mHandleThread.quit();
 
-        mContext.unbindService(mIjkMediaPlayerServiceConnection);
+        if (mIjkMediaPlayerServiceConnection != null) {
+            try {
+                mContext.unbindService(mIjkMediaPlayerServiceConnection);
+            } catch (IllegalArgumentException e) {
+                e.printStackTrace();
+            }
+            mIjkMediaPlayerServiceConnection = null;
+        }
     }
 
     /**
@@ -735,6 +742,10 @@ public final class IjkMediaMetadataRetriever {
      * multiple instances are used at the same time.
      */
     public void release() {
+        if (mPlayerAction == PLAYER_ACTION_IS_RELEASE) {
+            return;
+        }
+
         mPlayerAction = PLAYER_ACTION_IS_RELEASE;
         if (mPlayer != null && mServiceIsConnected) {
             try {
@@ -758,7 +769,11 @@ public final class IjkMediaMetadataRetriever {
                     mWaitList.clear();
                 }
                 if (mIjkMediaPlayerServiceConnection != null) {
-                    mContext.unbindService(mIjkMediaPlayerServiceConnection);
+                    try {
+                        mContext.unbindService(mIjkMediaPlayerServiceConnection);
+                    } catch (IllegalArgumentException e) {
+                        e.printStackTrace();
+                    }
                     mIjkMediaPlayerServiceConnection = null;
                 }
                 mSomeWorkHandle.removeCallbacksAndMessages(null);

@@ -1407,7 +1407,14 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
         mHandleThread.quit();
 
-        mContext.unbindService(mIjkMediaPlayerServiceConnection);
+        if (mIjkMediaPlayerServiceConnection != null) {
+            try {
+                mContext.unbindService(mIjkMediaPlayerServiceConnection);
+            } catch (IllegalArgumentException e) {
+                e.printStackTrace();
+            }
+            mIjkMediaPlayerServiceConnection = null;
+        }
     }
 
     public void syncRelease() {
@@ -1438,7 +1445,12 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                 onBuglyReport(e);
             }
         }
-        mContext.unbindService(mIjkMediaPlayerServiceConnection);
+        try {
+            mContext.unbindService(mIjkMediaPlayerServiceConnection);
+        } catch (IllegalArgumentException e) {
+            e.printStackTrace();
+        }
+        mIjkMediaPlayerServiceConnection = null;
     }
 
     /**
@@ -1487,7 +1499,11 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     mWaitList.clear();
                 }
                 if (mIjkMediaPlayerServiceConnection != null) {
-                    mContext.unbindService(mIjkMediaPlayerServiceConnection);
+                    try {
+                        mContext.unbindService(mIjkMediaPlayerServiceConnection);
+                    } catch (IllegalArgumentException e) {
+                        e.printStackTrace();
+                    }
                     mIjkMediaPlayerServiceConnection = null;
                 }
                 mSomeWorkHandle.removeCallbacksAndMessages(null);
