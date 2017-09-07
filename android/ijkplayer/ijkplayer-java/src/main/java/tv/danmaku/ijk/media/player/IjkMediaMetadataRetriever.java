@@ -150,7 +150,13 @@ public final class IjkMediaMetadataRetriever {
                             player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "an", 1);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "mediacodec", 0);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "get-frame-mode", 1);
-                            player.mPlayer.setOptionString(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "protocol_whitelist", "ijkio,async,cache,crypto,file,http,https,ijkhttphook,ijkinject,ijklivehook,ijklongurl,ijksegment,ijktcphook,pipe,rtp,tcp,tls,udp,ijkurlhook,data");
+                            player.mPlayer.setOptionLong(OPT_CATEGORY_FORMAT, "auto_convert", 0);
+                            player.mPlayer.setOptionLong(OPT_CATEGORY_FORMAT, "only_read_file", 1);
+                            player.mPlayer.setOptionLong(OPT_CATEGORY_FORMAT, "safe", 0);
+                            player.mPlayer.setOptionLong(OPT_CATEGORY_FORMAT, "icy", 0);
+                            player.mPlayer.setOptionLong(OPT_CATEGORY_CODEC, "skip_loop_filter", 48);
+                            player.mPlayer.setOptionLong(OPT_CATEGORY_CODEC, "skip_frame", 8);
+                            player.mPlayer.setOptionString(OPT_CATEGORY_FORMAT, "protocol_whitelist", "ijkio,async,cache,crypto,file,http,https,ijkhttphook,ijkinject,ijklivehook,ijklongurl,ijksegment,ijktcphook,pipe,rtp,tcp,tls,udp,ijkurlhook,data");
                         } else {
                             this.removeCallbacksAndMessages(null);
                         }
