@@ -1074,17 +1074,6 @@ IjkMediaPlayer_native_setLogLevel(JNIEnv *env, jclass clazz, jint level)
 }
 
 static void
-IjkMediaPlayer_injectCacheNode(JNIEnv *env, jobject thiz, jint index, jlong file_logical_pos, jlong physical_pos, jlong cache_size, jlong file_size) {
-    IjkMediaPlayer *mp = jni_get_media_player(env, thiz);
-    JNI_CHECK_GOTO(mp, env, NULL, "mpjni: injectCacheNode: null mp", LABEL_RETURN);
-    ijkmp_set_ijkio_inject_node(mp, index, file_logical_pos, physical_pos, cache_size, file_size);
-
-LABEL_RETURN:
-    ijkmp_dec_ref_p(&mp);
-    return;
-}
-
-static void
 IjkMediaPlayer_setFrameAtTime(JNIEnv *env, jobject thiz, jstring path, jlong start_time, jlong end_time, jint num, jint definition) {
     IjkMediaPlayer *mp = jni_get_media_player(env, thiz);
     const char *c_path = NULL;
@@ -1155,7 +1144,6 @@ static JNINativeMethod g_methods[] = {
     { "_native_profileEnd",      "()V",                      (void *) IjkMediaPlayer_native_profileEnd },
 
     { "_native_setLogLevel",     "(I)V",                     (void *) IjkMediaPlayer_native_setLogLevel },
-    { "_injectCacheNode",        "(IJJJJ)V",                  (void *) IjkMediaPlayer_injectCacheNode },
     { "_setFrameAtTime",         "(Ljava/lang/String;JJII)V", (void *) IjkMediaPlayer_setFrameAtTime },
 };
 
