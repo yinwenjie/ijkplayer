@@ -509,6 +509,11 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
     }
 
     @Override
+    public int getIjkFd(ParcelFileDescriptor fd) {
+        return fd.getFd();
+    }
+
+    @Override
     public void setDataSourceFd(ParcelFileDescriptor fd) {
         mProtectHandle.sendEmptyMessageDelayed(MSG_NATIVE_PROTECT_SETDATASOURCEFD, PROTECT_DELAY);
         try {
