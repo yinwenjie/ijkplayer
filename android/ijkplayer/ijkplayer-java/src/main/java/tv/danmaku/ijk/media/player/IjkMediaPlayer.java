@@ -1095,6 +1095,18 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         setDataSource(fd);
     }
 
+    private int getIjkFd(FileDescriptor fd) throws IOException {
+        ParcelFileDescriptor pfd = ParcelFileDescriptor.dup(fd);
+        if (mPlayer != null && mServiceIsConnected) {
+            try {
+                return mPlayer.getIjkFd(pfd);
+            } catch (RemoteException e) {
+                onBuglyReport(e);
+            }
+        }
+        return -1;
+    }
+
     @Override
     public String getDataSource() {
         return mDataSource;
