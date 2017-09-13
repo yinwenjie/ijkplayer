@@ -145,7 +145,8 @@ public final class IjkMediaMetadataRetriever {
                             player.mPlayer.setOptionLong(OPT_CATEGORY_FORMAT, "dns_cache_timeout", 2 * 60 * 60 * 1000);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_FORMAT, "safe", 0);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "skip-calc-frame-rate", 1);
-                            player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "min-frames", 480);
+                            player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "max-buffer-size", 8 * 1024 * 1024);
+                            player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "min-frames", 240);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "start-on-prepared", 1);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "an", 1);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_PLAYER, "mediacodec", 0);
