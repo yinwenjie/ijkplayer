@@ -324,11 +324,17 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     break;
                 case DO_SETDATASOURCEFD:
                     try {
-                        if (player.mPlayer != null && player.mServiceIsConnected) {
-                            player.mPlayer.setDataSourceFd((ParcelFileDescriptor) msg.obj);
+                        ParcelFileDescriptor pfd = (ParcelFileDescriptor) msg.obj;
+                        if (pfd != null) {
+                            if (player.mPlayer != null && player.mServiceIsConnected) {
+                                player.mPlayer.setDataSourceFd(pfd);
+                            }
+                            pfd.close();
                         }
                     } catch (RemoteException e) {
                         player.onBuglyReport(e);
+                    } catch (IOException e) {
+                        e.printStackTrace();
                     }
                     break;
                 case DO_SETSTREAMSELECTED:
@@ -1096,15 +1102,20 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public int getIjkFd(FileDescriptor fd) throws IOException {
+        int ret = -1;
         ParcelFileDescriptor pfd = ParcelFileDescriptor.dup(fd);
-        if (mPlayer != null && mServiceIsConnected) {
-            try {
-                return mPlayer.getIjkFd(pfd);
-            } catch (RemoteException e) {
-                onBuglyReport(e);
+
+        if (pfd != null) {
+            if (mPlayer != null && mServiceIsConnected) {
+                try {
+                    ret = mPlayer.getIjkFd(pfd);
+                } catch (RemoteException e) {
+                    onBuglyReport(e);
+                }
             }
+            pfd.close();
         }
-        return -1;
+        return ret;
     }
 
     @Override
