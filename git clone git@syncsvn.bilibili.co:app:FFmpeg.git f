@@ -1,0 +1,4 @@
+git clone git@syncsvn.bilibili.co:app/FFmpeg.git ffmpeg
+cd ffmpeg
+git fetch origin
+git checkout -b feature/alpha-quick-mp4 origin/feature/alpha-quick-mp4
