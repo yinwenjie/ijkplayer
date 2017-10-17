@@ -4075,6 +4075,9 @@ int ffp_prepare_async_l(FFPlayer *ffp, const char *file_name)
         }
     }
 
+    av_log_set_level(AV_LOG_TRACE);
+    av_dict_set(&ffp->format_opts, "quick_parse_mp4", "1", 0);
+    
     av_log(NULL, AV_LOG_INFO, "===== versions =====\n");
     ffp_show_version_str(ffp, "ijkplayer",      ijk_version_info());
     ffp_show_version_str(ffp, "FFmpeg",         av_version_info());
