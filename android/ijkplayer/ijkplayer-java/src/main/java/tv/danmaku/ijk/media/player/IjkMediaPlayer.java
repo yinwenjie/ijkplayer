@@ -146,6 +146,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     public static final int FFP_PROP_INT64_BIT_RATE                         = 20100;
     public static final int FFP_PROP_INT64_TCP_SPEED                        = 20200;
     public static final int FFP_PROP_INT64_LATEST_SEEK_LOAD_DURATION        = 20300;
+    public static final int FFP_PROP_INT64_IMMEDIATE_RECONNECT              = 20211;
     //----------------------------------------
 
     public static final int PLAYER_ACTION_IS_INIT    = 10001;
@@ -2056,6 +2057,20 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                     mSomeWorkHandle.obtainMessage(DO_SETPROPERTYLONG, FFP_PROP_INT64_SHARE_CACHE_DATA, 0, (long) share).sendToTarget();
                 } else {
                     mWaitList.add(mSomeWorkHandle.obtainMessage(DO_SETPROPERTYLONG, FFP_PROP_INT64_SHARE_CACHE_DATA, 0, (long) share));
+                }
+            }
+        }
+    }
+
+    public void httphookReconnect() {
+        if (mPlayer != null && mServiceIsConnected) {
+            mSomeWorkHandle.obtainMessage(DO_SETPROPERTYLONG, FFP_PROP_INT64_IMMEDIATE_RECONNECT, 0, 1).sendToTarget();
+        } else {
+            synchronized (mWaitList) {
+                if (mPlayer != null && mServiceIsConnected) {
+                    mSomeWorkHandle.obtainMessage(DO_SETPROPERTYLONG, FFP_PROP_INT64_IMMEDIATE_RECONNECT, 0, 1).sendToTarget();
+                } else {
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_SETPROPERTYLONG, FFP_PROP_INT64_IMMEDIATE_RECONNECT, 0, 1));
                 }
             }
         }
