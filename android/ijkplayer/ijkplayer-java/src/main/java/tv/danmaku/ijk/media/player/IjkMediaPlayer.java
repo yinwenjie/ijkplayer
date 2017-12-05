@@ -2064,13 +2064,13 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
     public void httphookReconnect() {
         if (mPlayer != null && mServiceIsConnected) {
-            mSomeWorkHandle.obtainMessage(DO_SETPROPERTYLONG, FFP_PROP_INT64_IMMEDIATE_RECONNECT, 0, 1).sendToTarget();
+            mSomeWorkHandle.obtainMessage(DO_SETPROPERTYLONG, FFP_PROP_INT64_IMMEDIATE_RECONNECT, 0, (long)1).sendToTarget();
         } else {
             synchronized (mWaitList) {
                 if (mPlayer != null && mServiceIsConnected) {
-                    mSomeWorkHandle.obtainMessage(DO_SETPROPERTYLONG, FFP_PROP_INT64_IMMEDIATE_RECONNECT, 0, 1).sendToTarget();
+                    mSomeWorkHandle.obtainMessage(DO_SETPROPERTYLONG, FFP_PROP_INT64_IMMEDIATE_RECONNECT, 0, (long)1).sendToTarget();
                 } else {
-                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_SETPROPERTYLONG, FFP_PROP_INT64_IMMEDIATE_RECONNECT, 0, 1));
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_SETPROPERTYLONG, FFP_PROP_INT64_IMMEDIATE_RECONNECT, 0, (long)1));
                 }
             }
         }
