@@ -3048,6 +3048,10 @@ static int read_thread(void *arg)
 
     if (ffp->iformat_name)
         is->iformat = av_find_input_format(ffp->iformat_name);
+
+    if (ffp->quick_parse_mp4) {
+        av_dict_set(&ffp->format_opts, "quick_parse_mp4", "1", 0);
+    }
     err = avformat_open_input(&ic, is->filename, is->iformat, &ffp->format_opts);
     if (err < 0) {
         print_error(is->filename, err);

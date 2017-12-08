@@ -199,6 +199,8 @@ static const AVOption ffp_context_options[] = {
         OPTION_OFFSET(mediacodec_sync),           OPTION_INT(0, 0, 1) },
     { "mediacodec-default-name",          "mediacodec default name",
         OPTION_OFFSET(mediacodec_default_name),      OPTION_STR(NULL) },
+    { "quick-parse-mp4",          "enable quick_parse_mp4",
+        OPTION_OFFSET(quick_parse_mp4),      OPTION_INT(0, 0, 1) },
 
     { NULL }
 };

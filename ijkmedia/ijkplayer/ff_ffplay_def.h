@@ -714,6 +714,7 @@ typedef struct FFPlayer {
     int async_init_decoder;
     char *video_mime_type;
     char *mediacodec_default_name;
+    int quick_parse_mp4;
 } FFPlayer;
 
 #define fftime_to_milliseconds(ts) (av_rescale(ts, 1000, AV_TIME_BASE))
