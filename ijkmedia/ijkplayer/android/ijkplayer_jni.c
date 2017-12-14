@@ -42,7 +42,7 @@
 
 #define JNI_MODULE_PACKAGE      "tv/danmaku/ijk/media/player"
 #define JNI_CLASS_IJKPLAYER_SERVICE     "tv/danmaku/ijk/media/player/services/IjkMediaPlayerClient"
-#define JNI_IJK_MEDIA_EXCEPTION "tv/danmaku/ijk/media/player/IjkMediaException"
+#define JNI_IJK_MEDIA_EXCEPTION "tv/danmaku/ijk/media/player/exceptions/IjkMediaException"
 
 #define IJK_CHECK_MPRET_GOTO(retval, env, label) \
     JNI_CHECK_GOTO((retval != EIJK_INVALID_STATE), env, "java/lang/IllegalStateException", NULL, label); \
