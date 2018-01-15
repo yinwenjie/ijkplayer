@@ -1,6 +1,13 @@
 tag next
 --------------------------------
 
+tag k0.8.7
+--------------------------------
+- ffmpeg: upgrade to 3.4
+- ffmpeg: fix hls some issue
+- android: fix seek bug when no audio
+- openssl: upgrade to 1.0.2n
+
 tag k0.8.6
 --------------------------------
 - ijkplayer: fix opengl config error
