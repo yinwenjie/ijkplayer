@@ -1,0 +1,162 @@
+globals.lo: globals.c libxml.h include/libxml/xmlstring.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/lib/gcc/arm-linux-androideabi/4.9.x/include/stdarg.h \
+ include/libxml/xmlversion.h include/libxml/xmlexports.h config.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/stdio.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/sys/cdefs.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/sys/cdefs_elf.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/android/api-level.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/sys/types.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/lib/gcc/arm-linux-androideabi/4.9.x/include/stddef.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/lib/gcc/arm-linux-androideabi/4.9.x/include/stdint.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/stdint.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/sys/_types.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/machine/_types.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/sys/_wchar_limits.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/linux/posix_types.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/linux/stddef.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/linux/compiler.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/asm/posix_types.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/asm/types.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/linux/types.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/machine/kernel.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/sys/sysmacros.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/stdlib.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/string.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/malloc.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/alloca.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/strings.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/memory.h \
+ include/libxml/globals.h include/libxml/parser.h include/libxml/tree.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/lib/gcc/arm-linux-androideabi/4.9.x/include-fixed/limits.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/lib/gcc/arm-linux-androideabi/4.9.x/include-fixed/syslimits.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/limits.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/sys/limits.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/linux/limits.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/machine/internal_types.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/machine/limits.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/sys/syslimits.h \
+ /Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/asm/page.h \
+ include/libxml/xmlregexp.h include/libxml/dict.h include/libxml/hash.h \
+ include/libxml/valid.h include/libxml/xmlerror.h include/libxml/list.h \
+ include/libxml/xmlautomata.h include/libxml/entities.h \
+ include/libxml/encoding.h include/libxml/xmlIO.h include/libxml/SAX.h \
+ include/libxml/xlink.h include/libxml/SAX2.h include/libxml/xmlmemory.h \
+ include/libxml/threads.h elfgcchack.h
+
+libxml.h:
+
+include/libxml/xmlstring.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/lib/gcc/arm-linux-androideabi/4.9.x/include/stdarg.h:
+
+include/libxml/xmlversion.h:
+
+include/libxml/xmlexports.h:
+
+config.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/stdio.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/sys/cdefs.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/sys/cdefs_elf.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/android/api-level.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/sys/types.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/lib/gcc/arm-linux-androideabi/4.9.x/include/stddef.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/lib/gcc/arm-linux-androideabi/4.9.x/include/stdint.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/stdint.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/sys/_types.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/machine/_types.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/sys/_wchar_limits.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/linux/posix_types.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/linux/stddef.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/linux/compiler.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/asm/posix_types.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/asm/types.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/linux/types.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/machine/kernel.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/sys/sysmacros.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/stdlib.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/string.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/malloc.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/alloca.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/strings.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/memory.h:
+
+include/libxml/globals.h:
+
+include/libxml/parser.h:
+
+include/libxml/tree.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/lib/gcc/arm-linux-androideabi/4.9.x/include-fixed/limits.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/lib/gcc/arm-linux-androideabi/4.9.x/include-fixed/syslimits.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/limits.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/sys/limits.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/linux/limits.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/machine/internal_types.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/machine/limits.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/sys/syslimits.h:
+
+/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/toolchain/sysroot/usr/include/asm/page.h:
+
+include/libxml/xmlregexp.h:
+
+include/libxml/dict.h:
+
+include/libxml/hash.h:
+
+include/libxml/valid.h:
+
+include/libxml/xmlerror.h:
+
+include/libxml/list.h:
+
+include/libxml/xmlautomata.h:
+
+include/libxml/entities.h:
+
+include/libxml/encoding.h:
+
+include/libxml/xmlIO.h:
+
+include/libxml/SAX.h:
+
+include/libxml/xlink.h:
+
+include/libxml/SAX2.h:
+
+include/libxml/xmlmemory.h:
+
+include/libxml/threads.h:
+
+elfgcchack.h:

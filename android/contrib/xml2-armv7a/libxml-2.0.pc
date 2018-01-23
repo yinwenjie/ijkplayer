@@ -1,0 +1,13 @@
+prefix=/Users/raymond/work/develop/ijkplayer/android/contrib/build/xml2-armv7a/output
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+modules=1
+
+Name: libXML
+Version: 2.9.7
+Description: libXML library version2.
+Requires:
+Libs: -L${libdir} -lxml2
+Libs.private:   -lz   -lm  
+Cflags: -I${includedir}/libxml2 
