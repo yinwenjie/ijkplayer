@@ -656,7 +656,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
             if (player.mEventHandler != null) {
                 if (what == MEDIA_INFO && arg1 == MEDIA_INFO_VIDEO_RENDERING_START) {
                     player.notifyOnInfo(arg1, arg2);
-                } else if (what == MEDIA_INFO && (arg1 >= MEDIA_INFO_AUDIO_RENDERING_START && arg1 <= MEDIA_INFO_COMPONENT_OPEN)) {
+                } else if (what == MEDIA_INFO && (arg1 >= MEDIA_INFO_AUDIO_RENDERING_START && arg1 <= MEDIA_INFO_AUDIO_SEEK_RENDERING_START)) {
                     player.notifyOnInfo(arg1, arg2);
                 } else {
                     Message m = player.mEventHandler.obtainMessage(what, arg1, arg2);
