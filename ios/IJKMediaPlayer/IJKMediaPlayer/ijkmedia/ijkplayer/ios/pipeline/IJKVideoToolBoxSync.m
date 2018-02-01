@@ -761,7 +761,7 @@ static void dict_set_i32(CFMutableDictionaryRef dict, CFStringRef key,
     CFRelease(number);
 }
 
-static CMFormatDescriptionRef CreateFormatDescriptionFromCodecData(CMVideoCodecType format_id, int width, int height, const uint8_t *extradata, int extradata_size, uint32_t atom)
+static CMFormatDescriptionRef CreateFormatDescriptionFromCodecData(Uint32 format_id, int width, int height, const uint8_t *extradata, int extradata_size, uint32_t atom)
 {
     CMFormatDescriptionRef fmt_desc = NULL;
     OSStatus status;
@@ -773,19 +773,8 @@ static CMFormatDescriptionRef CreateFormatDescriptionFromCodecData(CMVideoCodecT
     /* CVPixelAspectRatio dict */
     dict_set_i32(par, CFSTR ("HorizontalSpacing"), 0);
     dict_set_i32(par, CFSTR ("VerticalSpacing"), 0);
-    
     /* SampleDescriptionExtensionAtoms dict */
-    switch (format_id) {
-        case kCMVideoCodecType_H264:
-            dict_set_data(atoms, CFSTR ("avcC"), (uint8_t *)extradata, extradata_size);
-            break;
-        case kCMVideoCodecType_HEVC:
-            dict_set_data(atoms, CFSTR ("hvcC"), (uint8_t *)extradata, extradata_size);
-            break;
-        default:
-            break;
-    }
-
+    dict_set_data(atoms, CFSTR ("avcC"), (uint8_t *)extradata, extradata_size);
 
       /* Extensions dict */
     dict_set_string(extensions, CFSTR ("CVImageBufferChromaLocationBottomField"), "left");
@@ -907,9 +896,6 @@ static int vtbformat_init(VTBFormatDesc *fmt_desc, AVCodecParameters *codecpar)
     int codec           = codecpar->codec_id;
     uint8_t* extradata  = codecpar->extradata;
 
-    bool isHevcSupported = false;
-    CMVideoCodecType format_id = 0;
-    
 #if 0
     switch (profile) {
         case FF_PROFILE_H264_HIGH_10:
@@ -931,39 +917,19 @@ static int vtbformat_init(VTBFormatDesc *fmt_desc, AVCodecParameters *codecpar)
         goto fail;
     }
 
-    if (extrasize < 7 || extradata == NULL) {
-        ALOGI("%s - avcC or hvcC atom data too small or missing", __FUNCTION__);
-        goto fail;
-    }
-
     switch (codec) {
-        case AV_CODEC_ID_HEVC:
-            format_id = kCMVideoCodecType_HEVC;
-            if (@available(iOS 11.0, *)) {
-                isHevcSupported = VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC);
-            } else {
-                // Fallback on earlier versions
-                isHevcSupported = false;
-            }
-            if (!isHevcSupported) {
+        case AV_CODEC_ID_H264:
+            if (extrasize < 7 || extradata == NULL) {
+                ALOGI("%s - avcC atom too data small or missing", __FUNCTION__);
                 goto fail;
             }
-            break;
-            
-        case AV_CODEC_ID_H264:
-            format_id = kCMVideoCodecType_H264;
-            break;
-            
-        default:
-            goto fail;
-    }
-    
-    if (extradata[0] == 1) {
-//                if (!validate_avcC_spc(extradata, extrasize, &fmt_desc->max_ref_frames, &sps_level, &sps_profile)) {
-            //goto failed;
-//                }
-        if (level == 0 && sps_level > 0)
-            level = sps_level;
+
+            if (extradata[0] == 1) {
+                if (!validate_avcC_spc(extradata, extrasize, &fmt_desc->max_ref_frames, &sps_level, &sps_profile)) {
+                    //goto failed;
+                }
+                if (level == 0 && sps_level > 0)
+                    level = sps_level;
 
                 if (profile == 0 && sps_profile > 0)
                     profile = sps_profile;
@@ -977,10 +943,10 @@ static int vtbformat_init(VTBFormatDesc *fmt_desc, AVCodecParameters *codecpar)
                     fmt_desc->convert_3byteTo4byteNALSize = true;
                 }
 
-        fmt_desc->fmt_desc = CreateFormatDescriptionFromCodecData(format_id, width, height, extradata, extrasize,  IJK_VTB_FCC_AVCC);
-        if (fmt_desc->fmt_desc == NULL) {
-            goto fail;
-        }
+                fmt_desc->fmt_desc = CreateFormatDescriptionFromCodecData(kCMVideoCodecType_H264, width, height, extradata, extrasize,  IJK_VTB_FCC_AVCC);
+                if (fmt_desc->fmt_desc == NULL) {
+                    goto fail;
+                }
 
                 ALOGI("%s - using avcC atom of size(%d), ref_frames(%d)", __FUNCTION__, extrasize, fmt_desc->max_ref_frames);
             } else {
@@ -1002,16 +968,20 @@ static int vtbformat_init(VTBFormatDesc *fmt_desc, AVCodecParameters *codecpar)
                         goto fail;
                     }
 
-            fmt_desc->fmt_desc = CreateFormatDescriptionFromCodecData(format_id, width, height, extradata, extrasize, IJK_VTB_FCC_AVCC);
-            if (fmt_desc->fmt_desc == NULL) {
-                goto fail;
-            }
+                    fmt_desc->fmt_desc = CreateFormatDescriptionFromCodecData(kCMVideoCodecType_H264, width, height, extradata, extrasize, IJK_VTB_FCC_AVCC);
+                    if (fmt_desc->fmt_desc == NULL) {
+                        goto fail;
+                    }
 
-            av_free(extradata);
-        } else {
-            ALOGI("%s - invalid avcC atom data", __FUNCTION__);
+                    av_free(extradata);
+                } else {
+                    ALOGI("%s - invalid avcC atom data", __FUNCTION__);
+                    goto fail;
+                }
+            }
+            break;
+        default:
             goto fail;
-        }
     }
 
     fmt_desc->max_ref_frames = FFMAX(fmt_desc->max_ref_frames, 2);
