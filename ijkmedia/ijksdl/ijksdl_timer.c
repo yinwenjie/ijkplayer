@@ -144,7 +144,7 @@ float SDL_SpeedSamplerAdd(SDL_SpeedSampler *sampler, int enable_log, const char 
     } else {
         sampler->count++;
     }
-
+    sampler->real_count++;
     if (sampler->count < 2)
         return 0;
 
@@ -158,6 +158,9 @@ float SDL_SpeedSamplerAdd(SDL_SpeedSampler *sampler, int enable_log, const char 
     return samples_per_second;
 }
 
+int64_t SDL_GetSamplerCount(SDL_SpeedSampler *sampler) {
+    return sampler->real_count;
+}
 
 
 void SDL_SpeedSampler2Reset(SDL_SpeedSampler2 *sampler, int sample_range)

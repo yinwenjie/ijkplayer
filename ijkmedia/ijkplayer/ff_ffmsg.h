@@ -66,6 +66,7 @@
 #define FFP_PROP_FLOAT_AVDELAY                          10004
 #define FFP_PROP_FLOAT_AVDIFF                           10005
 #define FFP_PROP_FLOAT_DROP_FRAME_RATE                  10007
+#define FFP_PROP_FLOAT_AUDIO_DECODE_FRAMES_PER_SECOND   10008
 
 #define FFP_PROP_INT64_SELECTED_VIDEO_STREAM            20001
 #define FFP_PROP_INT64_SELECTED_AUDIO_STREAM            20002
@@ -105,5 +106,7 @@
 #define FFP_PROP_INT64_LOGICAL_FILE_SIZE                20209
 #define FFP_PROP_INT64_SHARE_CACHE_DATA                 20210
 #define FFP_PROP_INT64_IMMEDIATE_RECONNECT              20211
+#define FFP_PROP_INT64_ADECODE_COUNT                    20212
+#define FFP_PROP_INT64_VDECODE_COUNT                    20213
 
 #endif

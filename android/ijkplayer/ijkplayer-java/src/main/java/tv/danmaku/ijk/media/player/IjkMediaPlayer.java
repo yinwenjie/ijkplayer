@@ -140,6 +140,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     public static final int FFP_PROP_INT64_TCP_SPEED                        = 20200;
     public static final int FFP_PROP_INT64_LATEST_SEEK_LOAD_DURATION        = 20300;
     public static final int FFP_PROP_INT64_IMMEDIATE_RECONNECT              = 20211;
+    public static final int FFP_PROP_INT64_ADECODE_COUNT                    = 20212;
+    public static final int FFP_PROP_INT64_VDECODE_COUNT                    = 20212;
+    public static final int FFP_PROP_FLOAT_AUDIO_DECODE_FRAMES_PER_SECOND   = 10008;
     //----------------------------------------
 
     @AccessedByNative
@@ -824,6 +827,18 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
     public long getFileSize() {
         return _getPropertyLong(FFP_PROP_INT64_LOGICAL_FILE_SIZE, 0);
+    }
+
+    public long getAudioDecodeCount() {
+        return _getPropertyLong(FFP_PROP_INT64_ADECODE_COUNT, 0);
+    }
+
+    public long getVideoDecodeCount() {
+        return _getPropertyLong(FFP_PROP_INT64_VDECODE_COUNT, 0);
+    }
+
+    public float getAudioDecodeFramesPerSecond() {
+        return _getPropertyFloat(FFP_PROP_FLOAT_AUDIO_DECODE_FRAMES_PER_SECOND, 0.0f);
     }
 
     public long getBitRate() {

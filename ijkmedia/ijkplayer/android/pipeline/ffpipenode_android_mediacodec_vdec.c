@@ -1152,6 +1152,13 @@ static int drain_output_buffer_l(JNIEnv *env, IJKFF_Pipenode *node, int64_t time
         goto done;
     } else if (output_buffer_index >= 0) {
         ffp->stat.vdps = SDL_SpeedSamplerAdd(&opaque->sampler, FFP_SHOW_VDPS_MEDIACODEC, "vdps[MediaCodec]");
+        ffp->stat.v_decode_count = SDL_GetSamplerCount(&opaque->sampler);
+        SDL_AMediaCodec_releaseOutputBuffer(opaque->acodec, output_buffer_index, false);
+        if (opaque->decoder->queue->abort_request)
+            ret = -1;
+        else
+            ret = 0;
+        return ret;
 
         if (dequeue_count)
             ++*dequeue_count;

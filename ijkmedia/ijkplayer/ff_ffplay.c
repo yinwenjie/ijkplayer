@@ -579,6 +579,7 @@ static int decoder_decode_frame(FFPlayer *ffp, Decoder *d, AVFrame *frame, AVSub
                         ret = avcodec_receive_frame(d->avctx, frame);
                         if (ret >= 0) {
                             ffp->stat.vdps = SDL_SpeedSamplerAdd(&ffp->vdps_sampler, FFP_SHOW_VDPS_AVCODEC, "vdps[avcodec]");
+                            ffp->stat.v_decode_count = SDL_GetSamplerCount(&ffp->vdps_sampler);
                             if (ffp->decoder_reorder_pts == -1) {
                                 frame->pts = frame->best_effort_timestamp;
                             } else if (!ffp->decoder_reorder_pts) {
@@ -588,6 +589,8 @@ static int decoder_decode_frame(FFPlayer *ffp, Decoder *d, AVFrame *frame, AVSub
                         break;
                     case AVMEDIA_TYPE_AUDIO:
                         ret = avcodec_receive_frame(d->avctx, frame);
+                        ffp->stat.adps = SDL_SpeedSamplerAdd(&ffp->adps_sampler, FFP_SHOW_ADPS, "adps");
+                        ffp->stat.a_decode_count = SDL_GetSamplerCount(&ffp->adps_sampler);
                         if (ret >= 0) {
                             AVRational tb = (AVRational){1, frame->sample_rate};
                             if (frame->pts != AV_NOPTS_VALUE)
@@ -1695,6 +1698,8 @@ static int get_video_frame(FFPlayer *ffp, AVFrame *frame)
         return -1;
 
     if (got_picture) {
+        av_frame_unref(frame);
+        return 0;
         double dpts = NAN;
 
         if (frame->pts != AV_NOPTS_VALUE)
@@ -2000,6 +2005,8 @@ static int audio_thread(void *arg)
         ffp_audio_statistic_l(ffp);
         if ((got_frame = decoder_decode_frame(ffp, &is->auddec, frame, NULL)) < 0)
             goto the_end;
+        else
+            continue;
 
         if (got_frame) {
                 tb = (AVRational){1, frame->sample_rate};
@@ -4885,6 +4892,8 @@ float ffp_get_property_float(FFPlayer *ffp, int id, float default_value)
     switch (id) {
         case FFP_PROP_FLOAT_VIDEO_DECODE_FRAMES_PER_SECOND:
             return ffp ? ffp->stat.vdps : default_value;
+        case FFP_PROP_FLOAT_AUDIO_DECODE_FRAMES_PER_SECOND:
+            return ffp ? ffp->stat.adps : default_value;
         case FFP_PROP_FLOAT_VIDEO_OUTPUT_FRAMES_PER_SECOND:
             return ffp ? ffp->stat.vfps : default_value;
         case FFP_PROP_FLOAT_PLAYBACK_RATE:
@@ -5002,6 +5011,14 @@ int64_t ffp_get_property_int64(FFPlayer *ffp, int id, int64_t default_value)
             if (!ffp)
                 return default_value;
             return ffp->stat.logical_file_size;
+        case FFP_PROP_INT64_ADECODE_COUNT:
+            if (!ffp)
+                return default_value;
+            return ffp->stat.a_decode_count;
+        case FFP_PROP_INT64_VDECODE_COUNT:
+            if (!ffp)
+                return default_value;
+            return ffp->stat.v_decode_count;
         default:
             return default_value;
     }

@@ -134,8 +134,10 @@ public class InfoHudViewHolder {
 
                     float fpsOutput = mp.getVideoOutputFramesPerSecond();
                     float fpsDecode = mp.getVideoDecodeFramesPerSecond();
-                    setRowValue(R.string.fps, String.format(Locale.US, "%.2f / %.2f", fpsDecode, fpsOutput));
-
+                    setRowValue(R.string.vfps, String.format(Locale.US, "vfps:%.2f", fpsDecode));
+                    setRowValue(R.string.v_count, String.format(Locale.US, "vcount:%d", mp.getVideoDecodeCount()));
+                    setRowValue(R.string.afps, String.format(Locale.US, "afps:%.2f", mp.getAudioDecodeFramesPerSecond()));
+                    setRowValue(R.string.a_count, String.format(Locale.US, "acount:%d", mp.getAudioDecodeCount()));
                     long videoCachedDuration = mp.getVideoCachedDuration();
                     long audioCachedDuration = mp.getAudioCachedDuration();
                     long videoCachedBytes    = mp.getVideoCachedBytes();

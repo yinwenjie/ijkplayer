@@ -15,7 +15,10 @@
     <string name="toggle_ratio">Scale</string>
     <string name="show_info">Info</string>
     <string name="vdec">vdec</string>
-    <string name="fps">fps</string>
+    <string name="vfps">vfps</string>
+    <string name="v_count">v_count</string>
+    <string name="afps">afps</string>
+    <string name="a_count">a_count</string>
     <string name="v_cache">v-cache</string>
     <string name="a_cache">a-cache</string>
     <string name="load_cost">load-cost</string>

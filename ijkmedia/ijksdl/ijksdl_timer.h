@@ -53,12 +53,13 @@ int64_t SDL_ProfilerEnd(SDL_Profiler* profiler);
 
 typedef struct SDL_SpeedSampler
 {
-    Uint64  samples[10];
+    Uint64  samples[50];
 
     int     capacity;
     int     count;
     int     first_index;
     int     next_index;
+    int64_t real_count;
 
     Uint64  last_log_time;
 } SDL_SpeedSampler;
@@ -81,5 +82,6 @@ typedef struct SDL_SpeedSampler2
 void    SDL_SpeedSampler2Reset(SDL_SpeedSampler2 *sampler, int sample_range);
 int64_t SDL_SpeedSampler2Add(SDL_SpeedSampler2 *sampler, int quantity);
 int64_t SDL_SpeedSampler2GetSpeed(SDL_SpeedSampler2 *sampler);
+int64_t SDL_GetSamplerCount(SDL_SpeedSampler *sampler);
 
 #endif

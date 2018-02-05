@@ -495,6 +495,9 @@ typedef struct FFStatistic
 
     float vfps;
     float vdps;
+    float adps;
+    int64_t v_decode_count;
+    int64_t a_decode_count;
     float avdelay;
     float avdiff;
     int64_t bit_rate;
@@ -690,6 +693,7 @@ typedef struct FFPlayer {
 
     SDL_SpeedSampler vfps_sampler;
     SDL_SpeedSampler vdps_sampler;
+    SDL_SpeedSampler adps_sampler;
 
     /* filters */
     SDL_mutex  *vf_mutex;
@@ -835,6 +839,7 @@ inline static void ffp_reset_internal(FFPlayer *ffp)
 
     SDL_SpeedSamplerReset(&ffp->vfps_sampler);
     SDL_SpeedSamplerReset(&ffp->vdps_sampler);
+    SDL_SpeedSamplerReset(&ffp->adps_sampler);
 
     /* filters */
     ffp->vf_changed                     = 0;
