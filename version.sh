@@ -3,7 +3,7 @@
 set -e
 
 VERSION_CODE=800700
-VERSION_NAME=0.8.7-test
+VERSION_NAME=0.8.7-test2
 VERSION_TARGET=$1
 
 do_version_readme() {
