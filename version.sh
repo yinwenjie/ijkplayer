@@ -3,7 +3,7 @@
 set -e
 
 VERSION_CODE=800800
-VERSION_NAME=0.8.8-service
+VERSION_NAME=0.8.8-mp4-rb0
 VERSION_TARGET=$1
 
 do_version_readme() {
