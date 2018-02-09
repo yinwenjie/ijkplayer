@@ -187,7 +187,7 @@ typedef struct PacketQueue {
 #define SAMPLE_QUEUE_SIZE 9
 #define FRAME_QUEUE_SIZE FFMAX(SAMPLE_QUEUE_SIZE, FFMAX(VIDEO_PICTURE_QUEUE_SIZE_MAX, SUBPICTURE_QUEUE_SIZE))
 
-#define VIDEO_MAX_FPS_DEFAULT 30
+#define VIDEO_MAX_FPS_DEFAULT 61
 
 typedef struct AudioParams {
     int freq;
@@ -808,7 +808,7 @@ inline static void ffp_reset_internal(FFPlayer *ffp)
 
     ffp->packet_buffering               = 1;
     ffp->pictq_size                     = VIDEO_PICTURE_QUEUE_SIZE_DEFAULT; // option
-    ffp->max_fps                        = 31; // option
+    ffp->max_fps                        = 61; // option
 
     ffp->videotoolbox                   = 0; // option
     ffp->vtb_max_frame_width            = 0; // option

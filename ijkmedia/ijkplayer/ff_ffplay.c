@@ -589,9 +589,9 @@ static int decoder_decode_frame(FFPlayer *ffp, Decoder *d, AVFrame *frame, AVSub
                         break;
                     case AVMEDIA_TYPE_AUDIO:
                         ret = avcodec_receive_frame(d->avctx, frame);
-                        ffp->stat.adps = SDL_SpeedSamplerAdd(&ffp->adps_sampler, FFP_SHOW_ADPS, "adps");
-                        ffp->stat.a_decode_count = SDL_GetSamplerCount(&ffp->adps_sampler);
                         if (ret >= 0) {
+                            ffp->stat.adps = SDL_SpeedSamplerAdd(&ffp->adps_sampler, FFP_SHOW_ADPS, "adps");
+                            ffp->stat.a_decode_count = SDL_GetSamplerCount(&ffp->adps_sampler);
                             AVRational tb = (AVRational){1, frame->sample_rate};
                             if (frame->pts != AV_NOPTS_VALUE)
                                 frame->pts = av_rescale_q(frame->pts, av_codec_get_pkt_timebase(d->avctx), tb);
