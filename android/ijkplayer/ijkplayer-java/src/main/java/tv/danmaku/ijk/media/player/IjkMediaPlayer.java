@@ -141,7 +141,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     public static final int FFP_PROP_INT64_LATEST_SEEK_LOAD_DURATION        = 20300;
     public static final int FFP_PROP_INT64_IMMEDIATE_RECONNECT              = 20211;
     public static final int FFP_PROP_INT64_ADECODE_COUNT                    = 20212;
-    public static final int FFP_PROP_INT64_VDECODE_COUNT                    = 20212;
+    public static final int FFP_PROP_INT64_VDECODE_COUNT                    = 20213;
     public static final int FFP_PROP_FLOAT_AUDIO_DECODE_FRAMES_PER_SECOND   = 10008;
     //----------------------------------------
 
