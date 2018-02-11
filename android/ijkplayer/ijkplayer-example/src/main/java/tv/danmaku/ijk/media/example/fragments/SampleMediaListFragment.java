@@ -79,8 +79,8 @@ public class SampleMediaListFragment extends Fragment {
         mAdapter.addItem("http://112.64.114.81:809/if5ax/upgcxcode/07/03/30960307/30960307-1-16.mp4?e=ig8g5X10ugNcXBlqNCNEto8g5gNvNE3DN0B5tZlqNxTEto8BTrNvN05fqx6S5ahE9IMvXBvE2ENvNCImNEVEK9GVqJIwqa80WXIekXRE9IB5to8euxZM2rNcNbUVhwdVhoM1hwdVhwdVNCM%3D&platform=android&uipk=5&uipv=5&deadline=1517834341&gen=playurl&um_deadline=1517834341&rate=0&um_sign=1feb2fca08267d7095637cda46629047&dynamic=1&os=kodo&oi=1883323832&upsig=a9c6e093abc6a8280e0bb4d90bb988c9&videoname=bm9ybWFsdmlkZW8%3D&apptype=app&userid=8d3c408b3e136d47986f120265984c6d&userip=112.65.61.184&spid=31117&pid=8031006300&preview=1&portalid=604&spip=upos-hz-mirrorkodo.acgvideo.com&spport=80&ugpid=979&tradeid=23ab1bba13574264abef09553a2712fe&lsttm=20180206003956&enkey=b9edc17e7516723321ae14144cf0ba23", "bipbop advanced 640x360 @ 580 kbps");
         mAdapter.addItem("ijkio:cache:httphook:ffio:http://10.23.35.178:8080/hls/1234", "bipbop advanced 960x540 @ 910 kbps");
         mAdapter.addItem("ijkio:cache:httphook:ffio:http://10.23.35.178:8080/hls/video.m3u8", "bipbop advanced 1289x720 @ 1 Mbps");
-        mAdapter.addItem("http://10.23.35.178:8080/hls/video.m3u8?ssig=12345", "bipbop advanced 1920x1080 @ 2 Mbps");
-        mAdapter.addItem("http://10.23.166.177/见习神明cq5.flv", "test");
+        mAdapter.addItem("file:sdcard/dance_1080p60.mp4", "bipbop advanced 1920x1080 @ 2 Mbps");
+        mAdapter.addItem("http://10.23.166.152/见习神明cq5.flv", "test");
     }
 
     final class SampleMediaItem {
