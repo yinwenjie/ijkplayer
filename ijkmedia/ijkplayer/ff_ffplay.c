@@ -1349,35 +1349,35 @@ retry:
             if (is->paused)
                 goto display;
 
-            // /* compute nominal last_duration */
-            // last_duration = vp_duration(is, lastvp, vp);
-            // delay = compute_target_delay(ffp, last_duration, is);
+            /* compute nominal last_duration */
+            last_duration = vp_duration(is, lastvp, vp);
+            delay = compute_target_delay(ffp, last_duration, is);
 
-            // time= av_gettime_relative()/1000000.0;
-            // if (isnan(is->frame_timer) || time < is->frame_timer)
-            //     is->frame_timer = time;
-            // if (time < is->frame_timer + delay) {
-            //     *remaining_time = FFMIN(is->frame_timer + delay - time, *remaining_time);
-            //     goto display;
-            // }
+            time= av_gettime_relative()/1000000.0;
+            if (isnan(is->frame_timer) || time < is->frame_timer)
+                is->frame_timer = time;
+            if (time < is->frame_timer + delay) {
+                *remaining_time = FFMIN(is->frame_timer + delay - time, *remaining_time);
+                goto display;
+            }
 
-            // is->frame_timer += delay;
-            // if (delay > 0 && time - is->frame_timer > AV_SYNC_THRESHOLD_MAX)
-            //     is->frame_timer = time;
+            is->frame_timer += delay;
+            if (delay > 0 && time - is->frame_timer > AV_SYNC_THRESHOLD_MAX)
+                is->frame_timer = time;
 
-            // SDL_LockMutex(is->pictq.mutex);
-            // if (!isnan(vp->pts))
-            //     update_video_pts(is, vp->pts, vp->pos, vp->serial);
-            // SDL_UnlockMutex(is->pictq.mutex);
+            SDL_LockMutex(is->pictq.mutex);
+            if (!isnan(vp->pts))
+                update_video_pts(is, vp->pts, vp->pos, vp->serial);
+            SDL_UnlockMutex(is->pictq.mutex);
 
-            // if (frame_queue_nb_remaining(&is->pictq) > 1) {
-            //     Frame *nextvp = frame_queue_peek_next(&is->pictq);
-            //     duration = vp_duration(is, vp, nextvp);
-            //     if(!is->step && (ffp->framedrop > 0 || (ffp->framedrop && get_master_sync_type(is) != AV_SYNC_VIDEO_MASTER)) && time > is->frame_timer + duration) {
-            //         frame_queue_next(&is->pictq);
-            //         goto retry;
-            //     }
-            // }
+            if (frame_queue_nb_remaining(&is->pictq) > 1) {
+                Frame *nextvp = frame_queue_peek_next(&is->pictq);
+                duration = vp_duration(is, vp, nextvp);
+                if(!is->step && (ffp->framedrop > 0 || (ffp->framedrop && get_master_sync_type(is) != AV_SYNC_VIDEO_MASTER)) && time > is->frame_timer + duration) {
+                    frame_queue_next(&is->pictq);
+                    goto retry;
+                }
+            }
 
             if (is->subtitle_st) {
                 while (frame_queue_nb_remaining(&is->subpq) > 0) {
@@ -3773,11 +3773,11 @@ static int video_refresh_thread(void *arg)
     VideoState *is = ffp->is;
     double remaining_time = 0.0;
     while (!is->abort_request) {
-        // if (remaining_time > 0.0)
-        //     av_usleep((int)(int64_t)(remaining_time * 1000000.0));
-        remaining_time = REFRESH_RATE;
-        if (is->show_mode != SHOW_MODE_NONE && (!is->paused || is->force_refresh))
-            video_refresh(ffp, &remaining_time);
+        if (ffp->mediacodec_avc > 0) {
+            av_usleep(10);
+        }
+        frame_queue_next(&is->pictq);
+        video_display2(ffp);
     }
 
     return 0;
