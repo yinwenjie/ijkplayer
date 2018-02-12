@@ -3774,7 +3774,7 @@ static int video_refresh_thread(void *arg)
     double remaining_time = 0.0;
     while (!is->abort_request) {
         if (ffp->mediacodec_avc > 0) {
-            av_usleep(10);
+            av_usleep(10 * 1000);
         }
         frame_queue_next(&is->pictq);
         video_display2(ffp);
