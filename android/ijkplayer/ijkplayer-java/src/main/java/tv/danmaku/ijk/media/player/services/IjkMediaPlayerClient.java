@@ -91,7 +91,7 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
     private static final int MSG_NATIVE_PROTECT_NATIVEPROFILEEND     = 34;
     private static final int MSG_NATIVE_PROTECT_NATIVESETLOGLEVEL    = 35;
     private static final int MSG_NATIVE_PROTECT_SETANDROIDIOCALLBACK = 36;
-    private static final int MSG_NATIVE_PROTECT_SETFRAMEATTIME       = 37;
+    private static final int MSG_NATIVE_PROTECT_ADDFRAMEOUTPUTTASK   = 37;
 
 
 
@@ -188,7 +188,7 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
 
     private native Bundle _getMediaMeta();
 
-    private native void _setFrameAtTime(String imgCachePath, long startTime, long endTime, int num, int imgDefinition)
+    private native int _addFrameOutputTask(String imgCachePath, long startTime, int frame_interval, int count, int imgDefinition, int frameType)
             throws IllegalArgumentException, IllegalStateException;
 
     public static native String _getColorFormatName(int mediaCodecColorFormat);
@@ -732,12 +732,14 @@ public class IjkMediaPlayerClient extends IIjkMediaPlayer.Stub {
     }
 
     @Override
-    public void setFrameAtTime(String imgCachePath, long startTime, long endTime, int num, int imgDefinition) {
-        mProtectHandle.sendEmptyMessageDelayed(MSG_NATIVE_PROTECT_SETFRAMEATTIME, PROTECT_DELAY);
+    public int addFrameOutputTask(String imgCachePath, long startTime, int frame_interval, int count, int imgDefinition, int frameType) {
+        int ret = -1;
+        mProtectHandle.sendEmptyMessageDelayed(MSG_NATIVE_PROTECT_ADDFRAMEOUTPUTTASK, PROTECT_DELAY);
         try {
-            _setFrameAtTime(imgCachePath, startTime, endTime, num, imgDefinition);
+            ret = _addFrameOutputTask(imgCachePath, startTime, frame_interval, count, imgDefinition, frameType);
         } catch (IllegalArgumentException | IllegalStateException ex) {
         }
-        mProtectHandle.removeMessages(MSG_NATIVE_PROTECT_SETFRAMEATTIME);
+        mProtectHandle.removeMessages(MSG_NATIVE_PROTECT_ADDFRAMEOUTPUTTASK);
+        return ret;
     }
 }

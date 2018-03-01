@@ -60,7 +60,7 @@ import tv.danmaku.android.log.BLog;
 import tv.danmaku.ijk.media.player.pragma.DebugLog;
 import tv.danmaku.ijk.media.player.services.IjkMediaPlayerService;
 
-public final class IjkMediaMetadataRetriever {
+public final class IjkMediaMetadataRetriever{
     private final static String TAG = IjkMediaMetadataRetriever.class.getName();
 
     private static final int MEDIA_PREPARED = 1;
@@ -76,6 +76,8 @@ public final class IjkMediaMetadataRetriever {
 
     public static final int PLAYER_ACTION_IS_INIT    = 10001;
     public static final int PLAYER_ACTION_IS_RELEASE = 10002;
+
+    public static final int FFP_PROP_INT64_DELETE_FRAMEOUTPUT_TASK = 30001;
 
 
     //----------------------------------------
@@ -93,10 +95,18 @@ public final class IjkMediaMetadataRetriever {
     private static final int SERVICE_CONNECTED       = 10;
     private static final int SERVICE_DISCONNECTED    = 11;
     private static final int NOTIFY_ONNATIVEINVOKE   = 12;
-    private static final int DO_SETFRAMEATTIME       = 14;
+    private static final int DO_ADDFRAMEOUTPUTTASK   = 14;
+    public static final int ORIGIN_IMAGE = 3;
     public static final int HD_IMAGE = 2;
     public static final int SD_IMAGE = 1;
     public static final int LD_IMAGE = 0;
+
+    public static final int CUR_FRAME_IMAGE    = 1;
+    public static final int TARGET_FRAME_IMAGE = 0;
+
+    public static final int FRAME_OUTPUT_ERROR       = -1;
+    public static final int IJK_ONERROR              = -10000;
+    public static final int IJK_SERVICE_DISCONNECTED = -10001;
 
     private String mDataSource;
     private Context mContext;
@@ -112,10 +122,12 @@ public final class IjkMediaMetadataRetriever {
     private boolean mHappenAnr = false;
 
     private long      mStartTime = 0;
-    private long        mEndTime = 0;
+    private int   mFrameInterval = 0;
     private int             mNum = 0;
     private int   mImgDefinition = 0;
+    private int       mFrameType = 0;
     private String mImgCachePath = null;
+    private OnPreparedListener mOnPreparedListener;
 
     private static class SomeWorkHandler extends Handler {
         private final WeakReference<IjkMediaMetadataRetriever> mWeakPlayer;
@@ -158,10 +170,29 @@ public final class IjkMediaMetadataRetriever {
                             player.mPlayer.setOptionLong(OPT_CATEGORY_CODEC, "skip_loop_filter", 48);
                             player.mPlayer.setOptionLong(OPT_CATEGORY_CODEC, "skip_frame", 8);
                             player.mPlayer.setOptionString(OPT_CATEGORY_FORMAT, "protocol_whitelist", "ijkio,async,cache,crypto,file,http,https,ijkhttphook,ijkinject,ijklivehook,ijklongurl,ijksegment,ijktcphook,pipe,rtp,tcp,tls,udp,ijkurlhook,data");
+
+                            Runtime rt=Runtime.getRuntime();
+                            long maxMemory = rt.maxMemory();
+                            long asyncForwardsCapacity;
+                            long asyncBackwardsCapacity;
+                            if (maxMemory > 24 * 1024 * 1024) {
+                                asyncForwardsCapacity = 8 * 1024 * 1024;
+                                asyncBackwardsCapacity = 4 * 1024 * 1024;
+                            } else {
+                                long per = maxMemory / 2;
+                                per /= 3;
+                                asyncForwardsCapacity = per;
+                                asyncBackwardsCapacity = per * 2;
+                            }
+                            player.mPlayer.setOptionLong(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "async-forwards-capacity", asyncForwardsCapacity);
+                            player.mPlayer.setOptionLong(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "async-backwards-capacity", asyncBackwardsCapacity);
                         } else {
                             this.removeCallbacksAndMessages(null);
                         }
                     } catch (RemoteException e) {
+                        player.onBuglyReport(e);
+                        this.removeCallbacksAndMessages(null);
+                    } catch (NullPointerException e) {
                         player.onBuglyReport(e);
                         this.removeCallbacksAndMessages(null);
                     }
@@ -247,10 +278,10 @@ public final class IjkMediaMetadataRetriever {
                         player.onBuglyReport(e);
                     }
                     break;
-                case DO_SETFRAMEATTIME:
+                case DO_ADDFRAMEOUTPUTTASK:
                     try {
                         if (player.mPlayer != null && player.mServiceIsConnected) {
-                            player.mPlayer.setFrameAtTime(player.mImgCachePath, player.mStartTime, player.mEndTime, player.mNum, player.mImgDefinition);
+                            player.mPlayer.addFrameOutputTask(player.mImgCachePath, player.mStartTime, player.mFrameInterval, player.mNum, player.mImgDefinition, player.mFrameType);
                         }
                     } catch (RemoteException e) {
                         player.onBuglyReport(e);
@@ -330,10 +361,12 @@ public final class IjkMediaMetadataRetriever {
             }
             switch (what) {
                 case MEDIA_PREPARED:
+                    if (mOnPreparedListener != null)
+                        mOnPreparedListener.onPrepared();
                     return;
                 case MEDIA_ERROR:
                     if (mOnFrameGenerateListener != null)
-                        mOnFrameGenerateListener.onFrameGenerate(0, -1, null);
+                        mOnFrameGenerateListener.onFrameGenerate(0, IJK_ONERROR, null);
                     return;
                 case MEDIA_GET_IMG_STATE:
                     if (mOnFrameGenerateListener != null)
@@ -484,6 +517,8 @@ public final class IjkMediaMetadataRetriever {
     }
 
     private void serviceDisConnectedHandle() {
+        if (mOnFrameGenerateListener != null)
+            mOnFrameGenerateListener.onFrameGenerate(0, IJK_SERVICE_DISCONNECTED, null);
     }
 
     public boolean serviceIsConnected() {
@@ -682,20 +717,6 @@ public final class IjkMediaMetadataRetriever {
                     mSomeWorkHandle.obtainMessage(DO_PREPAREASYNC).sendToTarget();
                 } else {
                     mWaitList.add(mSomeWorkHandle.obtainMessage(DO_PREPAREASYNC));
-                }
-            }
-        }
-    }
-
-    public void seekTo(long msec) {
-        if (mPlayer != null && mServiceIsConnected) {
-            mSomeWorkHandle.obtainMessage(DO_SEEKTO, msec).sendToTarget();
-        } else {
-            synchronized (mWaitList) {
-                if (mPlayer != null && mServiceIsConnected) {
-                    mSomeWorkHandle.obtainMessage(DO_SEEKTO, msec).sendToTarget();
-                } else {
-                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_SEEKTO, msec));
                 }
             }
         }
@@ -1011,23 +1032,70 @@ public final class IjkMediaMetadataRetriever {
         }
 
         mStartTime     = startTime;
-        mEndTime       = endTime;
+        if (num == 1) {
+            mFrameInterval = 0;
+        } else {
+            mFrameInterval = (int)(endTime - startTime) / (num - 1);
+        }
         mNum           = num;
         mImgDefinition = imgDefinition;
         mImgCachePath  = imgCachePath;
+        mFrameType     = TARGET_FRAME_IMAGE;
 
         if (mPlayer != null && mServiceIsConnected) {
-            mSomeWorkHandle.obtainMessage(DO_SETFRAMEATTIME).sendToTarget();
+            mSomeWorkHandle.obtainMessage(DO_ADDFRAMEOUTPUTTASK).sendToTarget();
         } else {
             synchronized (mWaitList) {
                 if (mPlayer != null && mServiceIsConnected) {
-                    mSomeWorkHandle.obtainMessage(DO_SETFRAMEATTIME).sendToTarget();
+                    mSomeWorkHandle.obtainMessage(DO_ADDFRAMEOUTPUTTASK).sendToTarget();
                 } else {
-                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_SETFRAMEATTIME));
+                    mWaitList.add(mSomeWorkHandle.obtainMessage(DO_ADDFRAMEOUTPUTTASK));
                 }
             }
         }
         return true;
+    }
+
+    public long getDuration() {
+        if (mPlayer != null && mServiceIsConnected) {
+            try {
+                return mPlayer.getDuration();
+            } catch (RemoteException e) {
+                onBuglyReport(e);
+            }
+        }
+        return 0;
+    }
+
+    public final void setOnPreparedListener(OnPreparedListener listener) {
+        mOnPreparedListener = listener;
+    }
+
+    public int addFrameOutputTask(String imgCachePath, long startTime, int frameInterval, int count, int imgDefinition, int frameType) {
+        if (mPlayer != null && mServiceIsConnected) {
+            try {
+                return mPlayer.addFrameOutputTask(imgCachePath, startTime, frameInterval, count, imgDefinition, frameType);
+            } catch (RemoteException e) {
+                return -1;
+            }
+        }
+        return -1;
+    }
+
+    public int deleteCurrentFrameOutputTask(long startTime) {
+        int ret;
+
+        if (mPlayer != null && mServiceIsConnected) {
+            try {
+                mPlayer.setPropertyLong(FFP_PROP_INT64_DELETE_FRAMEOUTPUT_TASK, startTime);
+                ret = 0;
+            } catch (RemoteException e) {
+                ret = -1;
+            }
+        } else {
+            ret = -1;
+        }
+        return ret;
     }
 
     public interface OnFrameGenerateListener {
@@ -1038,5 +1106,9 @@ public final class IjkMediaMetadataRetriever {
          * fileName : png file name
          */
         boolean onFrameGenerate(int timestamp, int resultCode, String fileName);
+    }
+
+    public interface OnPreparedListener {
+        boolean onPrepared();
     }
 }
