@@ -2277,7 +2277,9 @@ static int ffplay_video_thread(void *arg)
             if (frame_output_info->count <= 0) {
                 dst_pts = -1;
                 SDL_LockMutex(ffp->frame_output_mutex);
-                SDL_CondWait(ffp->frame_output_cond, ffp->frame_output_mutex);
+                if (!ffp->frame_output_info || ffp->frame_output_info->state != TASK_WAIT_TODO) {
+                    SDL_CondWait(ffp->frame_output_cond, ffp->frame_output_mutex);
+                }
                 if (ffp->frame_output_info && ffp->frame_output_info->state == TASK_WAIT_TODO) {
                     memcpy(frame_output_info, ffp->frame_output_info, sizeof(FrameOutputTaskInfo));
                     ffp->frame_output_info->state = TASK_DOING;
