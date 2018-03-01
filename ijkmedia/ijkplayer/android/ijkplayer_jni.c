@@ -1107,23 +1107,25 @@ IjkMediaPlayer_native_setLogLevel(JNIEnv *env, jclass clazz, jint level)
     ALOGD("moncleanup\n");
 }
 
-static void
-IjkMediaPlayer_setFrameAtTime(JNIEnv *env, jobject thiz, jstring path, jlong start_time, jlong end_time, jint num, jint definition) {
+static jint
+IjkMediaPlayer_addFrameOutputTask(JNIEnv *env, jobject thiz, jstring path, jlong start_time, jint frame_interval, jint count, jint definition, jint frame_type) {
     IjkMediaPlayer *mp = jni_get_media_player(env, thiz);
     const char *c_path = NULL;
-    JNI_CHECK_GOTO(path, env, "java/lang/IllegalArgumentException", "mpjni: setFrameAtTime: null path", LABEL_RETURN);
-    JNI_CHECK_GOTO(mp, env, "java/lang/IllegalStateException", "mpjni: setFrameAtTime: null mp", LABEL_RETURN);
+    int ret = -1;
+
+    JNI_CHECK_GOTO(path, env, "java/lang/IllegalArgumentException", "mpjni: addFrameOutputTask: null path", LABEL_RETURN);
+    JNI_CHECK_GOTO(mp, env, "java/lang/IllegalStateException", "mpjni: addFrameOutputTask: null mp", LABEL_RETURN);
 
     c_path = (*env)->GetStringUTFChars(env, path, NULL );
-    JNI_CHECK_GOTO(c_path, env, "java/lang/OutOfMemoryError", "mpjni: setFrameAtTime: path.string oom", LABEL_RETURN);
+    JNI_CHECK_GOTO(c_path, env, "java/lang/OutOfMemoryError", "mpjni: addFrameOutputTask: path.string oom", LABEL_RETURN);
 
-    ALOGV("setFrameAtTime: path %s", c_path);
-    ijkmp_set_frame_at_time(mp, c_path, start_time, end_time, num, definition);
+    ALOGV("addFrameOutputTask: path %s", c_path);
+    ret = ijkmp_add_frame_output_task(mp, c_path, start_time, frame_interval, count, definition, frame_type);
     (*env)->ReleaseStringUTFChars(env, path, c_path);
 
 LABEL_RETURN:
     ijkmp_dec_ref_p(&mp);
-    return;
+    return ret;
 }
 
 
@@ -1178,7 +1180,7 @@ static JNINativeMethod g_methods[] = {
     { "_native_profileEnd",      "()V",                      (void *) IjkMediaPlayer_native_profileEnd },
 
     { "_native_setLogLevel",     "(I)V",                     (void *) IjkMediaPlayer_native_setLogLevel },
-    { "_setFrameAtTime",         "(Ljava/lang/String;JJII)V", (void *) IjkMediaPlayer_setFrameAtTime },
+    { "_addFrameOutputTask",     "(Ljava/lang/String;JIIII)I", (void *) IjkMediaPlayer_addFrameOutputTask },
 };
 
 JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved)
