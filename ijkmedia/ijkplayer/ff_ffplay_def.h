@@ -139,23 +139,37 @@
 static unsigned sws_flags = SWS_BICUBIC;
 #endif
 
+#define ORIGIN_IMAGE 3  // follow video definition
 #define HD_IMAGE 2  // 640*360
 #define SD_IMAGE 1  // 320*180
 #define LD_IMAGE 0  // 160*90
-#define MAX_DEVIATION 1200000   // 1200ms
 
-typedef struct GetImgInfo {
-    char *img_path;
+#define TARGET_FRAME_IMAGE 0
+#define CUR_FRAME_IMAGE 1
+
+#define MAX_DEVIATION 1200000   // 1200ms
+#define FRAME_OUTPUT_IMG_PATH_LEN 1024
+
+enum FrameOutputTaskStatus {
+    TASK_IDLE = -1, TASK_WAIT_TODO = 0, TASK_DOING = 1
+} frame_output_task_status;
+
+typedef struct FrameOutputTaskInfo {
+    char img_path[FRAME_OUTPUT_IMG_PATH_LEN];
     int64_t start_time;
-    int64_t end_time;
     int64_t frame_interval;
-    int num;
+    int frame_type;
     int count;
-    int width;
-    int height;
+    int definition;
+    int cur_frame_width;
+    int cur_frame_height;
+    int cur_img_width;
+    int cur_img_height;
+    int cur_frame_format;
+    enum FrameOutputTaskStatus state;
     AVCodecContext *frame_img_codec_ctx;
     struct SwsContext *frame_img_convert_ctx;
-} GetImgInfo;
+} FrameOutputTaskInfo;
 
 typedef struct MyAVPacketList {
     AVPacket pkt;
@@ -714,12 +728,15 @@ typedef struct FFPlayer {
     int mediacodec_sync;
     int skip_calc_frame_rate;
     int get_frame_mode;
-    GetImgInfo *get_img_info;
+    FrameOutputTaskInfo *frame_output_info;
     int async_init_decoder;
     char *video_mime_type;
     char *mediacodec_default_name;
     int ijkmeta_delay_init;
     int render_wait_start;
+    int need_delete_task_time;
+    SDL_mutex *frame_output_mutex;
+    SDL_cond  *frame_output_cond;
 } FFPlayer;
 
 #define fftime_to_milliseconds(ts) (av_rescale(ts, 1000, AV_TIME_BASE))
@@ -830,6 +847,7 @@ inline static void ffp_reset_internal(FFPlayer *ffp)
     ffp->mediacodec_default_name        = NULL; // option
     ffp->ijkmeta_delay_init             = 0; // option
     ffp->render_wait_start              = 0;
+    ffp->need_delete_task_time          = -1;
 
     ijkmeta_reset(ffp->meta);
 

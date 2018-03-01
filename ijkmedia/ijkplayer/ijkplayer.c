@@ -146,13 +146,16 @@ void *ijkmp_set_inject_opaque(IjkMediaPlayer *mp, void *opaque)
     return prev_weak_thiz;
 }
 
-void ijkmp_set_frame_at_time(IjkMediaPlayer *mp, const char *path, int64_t start_time, int64_t end_time, int num, int definition)
+int ijkmp_add_frame_output_task(IjkMediaPlayer *mp, const char *path, int64_t start_time, int frame_interval, int count, int definition, int frame_type)
 {
     assert(mp);
 
-    MPTRACE("%s(%s,%lld,%lld,%d,%d)\n", __func__, path, start_time, end_time, num, definition);
-    ffp_set_frame_at_time(mp->ffplayer, path, start_time, end_time, num, definition);
+    MPTRACE("%s(%s,%lld,%d,%d,%d,%d)\n", __func__, path, start_time, frame_interval, count, definition, frame_type);
+    pthread_mutex_lock(&mp->mutex);
+    int ret = ffp_add_frame_output_task(mp->ffplayer, path, start_time, frame_interval, count, definition, frame_type);
+    pthread_mutex_unlock(&mp->mutex);
     MPTRACE("%s()=void\n", __func__);
+    return ret;
 }
 
 
