@@ -57,6 +57,6 @@ interface IIjkMediaPlayer {
     void nativeSetLogLevel(int level);
     void setAndroidIOCallback();
     long getAndroidIOTrafficStatistic();
-    void setFrameAtTime(String imgCachePath, long startTime, long endTime, int num, int imgDefinition);
+    int addFrameOutputTask(String imgCachePath, long startTime, int frame_interval, int count, int imgDefinition, int frameType);
     int getIjkFd(in ParcelFileDescriptor fd);
 }
