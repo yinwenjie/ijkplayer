@@ -375,8 +375,7 @@ static void decoder_init(Decoder *d, AVCodecContext *avctx, PacketQueue *queue, 
     SDL_ProfilerReset(&d->decode_profiler, -1);
 }
 
-static int convert_image(FFPlayer *ffp, AVFrame *src_frame, int64_t src_frame_pts, int width, int height) {
-    GetImgInfo *img_info = ffp->get_img_info;
+static int convert_image(FFPlayer *ffp, AVFrame *src_frame, int64_t src_frame_pts, int width, int height, FrameOutputTaskInfo *frame_output_info) {
     VideoState *is = ffp->is;
     AVFrame *dst_frame = NULL;
     AVPacket avpkt;
@@ -385,7 +384,7 @@ static int convert_image(FFPlayer *ffp, AVFrame *src_frame, int64_t src_frame_pt
     int dst_height = 0;
     int bytes = 0;
     void *buffer = NULL;
-    char file_path[1024] = {0};
+    char file_path[FRAME_OUTPUT_IMG_PATH_LEN + 20] = {0};
     char file_name[16] = {0};
     int fd = -1;
     int ret = 0;
@@ -394,13 +393,45 @@ static int convert_image(FFPlayer *ffp, AVFrame *src_frame, int64_t src_frame_pt
     float dar = 0;
     AVRational display_aspect_ratio;
     int file_name_length = 0;
+    int definition_width, definition_height;
 
-    if (!height || !width || !img_info->width || !img_info->height) {
+    if (!height || !width) {
         ret = -1;
         return ret;
     }
 
-    dar = (float) img_info->width / img_info->height;
+    if (frame_output_info->definition == HD_IMAGE) {
+        definition_width  = 640;
+        definition_height = 360;
+    } else if (frame_output_info->definition == SD_IMAGE) {
+        definition_width  = 320;
+        definition_height = 180;
+    } else if (frame_output_info->definition == ORIGIN_IMAGE) {
+        definition_width  = width;
+        definition_height = height;
+    } else {
+        definition_width  = 160;
+        definition_height = 90;
+    }
+
+    if (frame_output_info->cur_img_width != definition_width || frame_output_info->cur_img_height != definition_height
+        || frame_output_info->cur_frame_width != width || frame_output_info->cur_frame_height != height || frame_output_info->cur_frame_format != src_frame->format) {
+        if (frame_output_info->frame_img_convert_ctx) {
+            sws_freeContext(frame_output_info->frame_img_convert_ctx);
+            frame_output_info->frame_img_convert_ctx = NULL;
+        }
+        if (frame_output_info->frame_img_codec_ctx) {
+            avcodec_free_context(&frame_output_info->frame_img_codec_ctx);
+            frame_output_info->frame_img_codec_ctx = NULL;
+        }
+        frame_output_info->cur_frame_format = src_frame->format;
+        frame_output_info->cur_frame_height = height;
+        frame_output_info->cur_frame_width  = width;
+        frame_output_info->cur_img_width    = definition_width;
+        frame_output_info->cur_img_height   = definition_height;
+    }
+
+    dar = (float) frame_output_info->cur_img_width / frame_output_info->cur_img_height;
 
     if (is->viddec.avctx) {
         av_reduce(&display_aspect_ratio.num, &display_aspect_ratio.den,
@@ -418,25 +449,25 @@ static int convert_image(FFPlayer *ffp, AVFrame *src_frame, int64_t src_frame_pt
         return ret;
     }
 
-    if ((int)(origin_dar * 100) != (int)(dar * 100)) {
-        tmp = img_info->width / origin_dar;
-        if (tmp > img_info->height) {
-            img_info->width = img_info->height * origin_dar;
-        } else {
-            img_info->height = tmp;
-        }
-        av_log(NULL, AV_LOG_INFO, "%s img_info->width = %d, img_info->height = %d\n", __func__, img_info->width, img_info->height);
-    }
+    dst_width = frame_output_info->cur_img_width;
+    dst_height = frame_output_info->cur_img_height;
 
-    dst_width = img_info->width;
-    dst_height = img_info->height;
+    if ((int)(origin_dar * 100) != (int)(dar * 100)) {
+        tmp = frame_output_info->cur_img_width / origin_dar;
+        if (tmp > frame_output_info->cur_img_height) {
+            dst_width = frame_output_info->cur_img_height * origin_dar;
+        } else {
+            dst_height = tmp;
+        }
+        av_log(NULL, AV_LOG_INFO, "%s dst_width = %d, dst_height = %d\n", __func__, dst_width, dst_height);
+    }
 
     av_init_packet(&avpkt);
     avpkt.size = 0;
     avpkt.data = NULL;
 
-    if (!img_info->frame_img_convert_ctx) {
-        img_info->frame_img_convert_ctx = sws_getContext(width,
+    if (!frame_output_info->frame_img_convert_ctx) {
+        frame_output_info->frame_img_convert_ctx = sws_getContext(width,
 		    height,
 		    src_frame->format,
 		    dst_width,
@@ -447,34 +478,34 @@ static int convert_image(FFPlayer *ffp, AVFrame *src_frame, int64_t src_frame_pt
 		    NULL,
 		    NULL);
 
-        if (!img_info->frame_img_convert_ctx) {
+        if (!frame_output_info->frame_img_convert_ctx) {
             ret = -1;
             av_log(NULL, AV_LOG_ERROR, "%s sws_getContext failed\n", __func__);
             goto fail0;
         }
     }
 
-    if (!img_info->frame_img_codec_ctx) {
+    if (!frame_output_info->frame_img_codec_ctx) {
         AVCodec *image_codec = avcodec_find_encoder(AV_CODEC_ID_PNG);
         if (!image_codec) {
             ret = -1;
             av_log(NULL, AV_LOG_ERROR, "%s avcodec_find_encoder failed\n", __func__);
             goto fail0;
         }
-	    img_info->frame_img_codec_ctx = avcodec_alloc_context3(image_codec);
-        if (!img_info->frame_img_codec_ctx) {
+	    frame_output_info->frame_img_codec_ctx = avcodec_alloc_context3(image_codec);
+        if (!frame_output_info->frame_img_codec_ctx) {
             ret = -1;
             av_log(NULL, AV_LOG_ERROR, "%s avcodec_alloc_context3 failed\n", __func__);
             goto fail0;
         }
-        img_info->frame_img_codec_ctx->bit_rate = ffp->stat.bit_rate;
-        img_info->frame_img_codec_ctx->width = dst_width;
-        img_info->frame_img_codec_ctx->height = dst_height;
-        img_info->frame_img_codec_ctx->pix_fmt = AV_PIX_FMT_RGB24;
-        img_info->frame_img_codec_ctx->codec_type = AVMEDIA_TYPE_VIDEO;
-        img_info->frame_img_codec_ctx->time_base.num = ffp->is->video_st->time_base.num;
-        img_info->frame_img_codec_ctx->time_base.den = ffp->is->video_st->time_base.den;
-        avcodec_open2(img_info->frame_img_codec_ctx, image_codec, NULL);
+        frame_output_info->frame_img_codec_ctx->bit_rate = ffp->stat.bit_rate;
+        frame_output_info->frame_img_codec_ctx->width = dst_width;
+        frame_output_info->frame_img_codec_ctx->height = dst_height;
+        frame_output_info->frame_img_codec_ctx->pix_fmt = AV_PIX_FMT_RGB24;
+        frame_output_info->frame_img_codec_ctx->codec_type = AVMEDIA_TYPE_VIDEO;
+        frame_output_info->frame_img_codec_ctx->time_base.num = ffp->is->video_st->time_base.num;
+        frame_output_info->frame_img_codec_ctx->time_base.den = ffp->is->video_st->time_base.den;
+        avcodec_open2(frame_output_info->frame_img_codec_ctx, image_codec, NULL);
     }
 
     dst_frame = av_frame_alloc();
@@ -509,7 +540,7 @@ static int convert_image(FFPlayer *ffp, AVFrame *src_frame, int64_t src_frame_pt
         goto fail2;
     }
 
-    ret = sws_scale(img_info->frame_img_convert_ctx,
+    ret = sws_scale(frame_output_info->frame_img_convert_ctx,
             (const uint8_t * const *) src_frame->data,
             src_frame->linesize,
             0,
@@ -523,10 +554,10 @@ static int convert_image(FFPlayer *ffp, AVFrame *src_frame, int64_t src_frame_pt
         goto fail2;
     }
 
-    ret = avcodec_encode_video2(img_info->frame_img_codec_ctx, &avpkt, dst_frame, &got_packet);
+    ret = avcodec_encode_video2(frame_output_info->frame_img_codec_ctx, &avpkt, dst_frame, &got_packet);
 
     if (ret >= 0 && got_packet > 0) {
-        strcpy(file_path, img_info->img_path);
+        strcpy(file_path, frame_output_info->img_path);
         strcat(file_path, "/");
         sprintf(file_name, "%lld", src_frame_pts);
         strcat(file_name, ".png");
@@ -541,16 +572,18 @@ static int convert_image(FFPlayer *ffp, AVFrame *src_frame, int64_t src_frame_pt
         write(fd, avpkt.data, avpkt.size);
         close(fd);
 
-        img_info->count--;
+        frame_output_info->count--;
 
         file_name_length = (int)strlen(file_name) + 1;
 
-        if (img_info->count <= 0)
+        if (frame_output_info->count <= 0)
             ffp_notify_msg4(ffp, FFP_MSG_GET_IMG_STATE, (int) src_frame_pts, 1, file_name, file_name_length);
         else
             ffp_notify_msg4(ffp, FFP_MSG_GET_IMG_STATE, (int) src_frame_pts, 0, file_name, file_name_length);
 
         ret = 0;
+    } else {
+        ret = -1;
     }
 
 fail2:
@@ -1041,16 +1074,6 @@ static void stream_close(FFPlayer *ffp)
         ijk_soundtouch_destroy(is->handle);
     }
 #endif
-    if (ffp->get_img_info) {
-        if (ffp->get_img_info->frame_img_convert_ctx) {
-            sws_freeContext(ffp->get_img_info->frame_img_convert_ctx);
-        }
-        if (ffp->get_img_info->frame_img_codec_ctx) {
-            avcodec_free_context(&ffp->get_img_info->frame_img_codec_ctx);
-        }
-        av_freep(&ffp->get_img_info->img_path);
-        av_freep(&ffp->get_img_info);
-    }
     av_free(is->filename);
     av_free(is);
     ffp->is = NULL;
@@ -2186,6 +2209,8 @@ static int ffplay_video_thread(void *arg)
     int64_t last_dst_pts = -1;
     int retry_convert_image = 0;
     int convert_frame_count = 0;
+    FrameOutputTaskInfo *frame_output_info = NULL;
+    int videoq_serial = 0;
 
 #if CONFIG_AVFILTER
     AVFilterGraph *graph = avfilter_graph_alloc();
@@ -2219,24 +2244,80 @@ static int ffplay_video_thread(void *arg)
             continue;
 
         if (ffp->get_frame_mode) {
-            if (!ffp->get_img_info || ffp->get_img_info->count <= 0) {
+            if (is->abort_request) {
+                av_frame_unref(frame);
+                goto the_end;
+            }
+
+            if (!frame_output_info) {
+                dst_pts = -1;
+                frame_output_info = av_mallocz(sizeof(FrameOutputTaskInfo));
+                if (!frame_output_info) {
+                    av_log(NULL, AV_LOG_FATAL, "%s: av_mallocz frame_output_info error\n", __func__);
+                    av_frame_unref(frame);
+                    goto the_end;
+                }
+                SDL_LockMutex(ffp->frame_output_mutex);
+                if (ffp->frame_output_info && (ffp->frame_output_info->state == TASK_WAIT_TODO)) {
+                    memcpy(frame_output_info, ffp->frame_output_info, sizeof(FrameOutputTaskInfo));
+                    ffp->frame_output_info->state = TASK_DOING;
+                }
+                SDL_UnlockMutex(ffp->frame_output_mutex);
+                if (frame_output_info && frame_output_info->state == TASK_WAIT_TODO) {
+                    videoq_serial = is->videoq.serial;
+                    ffp_seek_to_l(ffp, frame_output_info->start_time);
+                    while ((videoq_serial == is->videoq.serial) && !is->abort_request) {
+                        SDL_Delay(5);
+                    }
+                }
                 av_frame_unref(frame);
                 continue;
             }
 
-            last_dst_pts = dst_pts;
+            if (frame_output_info->count <= 0) {
+                dst_pts = -1;
+                SDL_LockMutex(ffp->frame_output_mutex);
+                SDL_CondWait(ffp->frame_output_cond, ffp->frame_output_mutex);
+                if (ffp->frame_output_info && ffp->frame_output_info->state == TASK_WAIT_TODO) {
+                    memcpy(frame_output_info, ffp->frame_output_info, sizeof(FrameOutputTaskInfo));
+                    ffp->frame_output_info->state = TASK_DOING;
+                }
+                SDL_UnlockMutex(ffp->frame_output_mutex);
+                if (frame_output_info && (frame_output_info->state == TASK_WAIT_TODO)) {
+                    videoq_serial = is->videoq.serial;
+                    ffp_seek_to_l(ffp, frame_output_info->start_time);
+                    while ((videoq_serial == is->videoq.serial) && !is->abort_request) {
+                        SDL_Delay(5);
+                    }
+                }
+                av_frame_unref(frame);
+                continue;
+            }
 
-            if (dst_pts < 0) {
-                dst_pts = ffp->get_img_info->start_time;
-            } else {
-                dst_pts += (ffp->get_img_info->end_time - ffp->get_img_info->start_time) / (ffp->get_img_info->num - 1);
+            if (ffp->need_delete_task_time == frame_output_info->start_time) {
+                ffp->need_delete_task_time = -1;
+                frame_output_info->count = 0;
+                ffp_notify_msg3(ffp, FFP_MSG_GET_IMG_STATE, 0, 1);
+                av_frame_unref(frame);
+                continue;
             }
 
             pts = (frame->pts == AV_NOPTS_VALUE) ? NAN : frame->pts * av_q2d(tb);
             pts = pts * 1000;
+
+            last_dst_pts = dst_pts;
+            if (dst_pts < 0) {
+                if (frame_output_info->frame_type == CUR_FRAME_IMAGE) {
+                    dst_pts = pts;
+                } else {
+                    dst_pts = frame_output_info->start_time;
+                }
+            } else {
+                dst_pts += frame_output_info->frame_interval;
+            }
             if (pts >= dst_pts) {
                 while (retry_convert_image <= MAX_RETRY_CONVERT_IMAGE) {
-                    ret = convert_image(ffp, frame, (int64_t)pts, frame->width, frame->height);
+                    ret = convert_image(ffp, frame, (int64_t)pts, frame->width, frame->height, frame_output_info);
                     if (!ret) {
                         convert_frame_count++;
                         break;
@@ -2246,14 +2327,19 @@ static int ffplay_video_thread(void *arg)
                 }
 
                 retry_convert_image = 0;
-                if (ret || ffp->get_img_info->count <= 0) {
+                if (ret || frame_output_info->count <= 0) {
                     if (ret) {
+                        frame_output_info->count = 0;
                         av_log(NULL, AV_LOG_ERROR, "convert image abort ret = %d\n", ret);
                         ffp_notify_msg3(ffp, FFP_MSG_GET_IMG_STATE, 0, ret);
                     } else {
                         av_log(NULL, AV_LOG_INFO, "convert image complete convert_frame_count = %d\n", convert_frame_count);
                     }
-                    goto the_end;
+                    SDL_LockMutex(ffp->frame_output_mutex);
+                    if (ffp->frame_output_info) {
+                        ffp->frame_output_info->state = TASK_IDLE;
+                    }
+                    SDL_UnlockMutex(ffp->frame_output_mutex);
                 }
             } else {
                 dst_pts = last_dst_pts;
@@ -2327,6 +2413,9 @@ static int ffplay_video_thread(void *arg)
             goto the_end;
     }
  the_end:
+    if (ffp->get_frame_mode && frame_output_info) {
+        av_freep(&frame_output_info);
+    }
 #if CONFIG_AVFILTER
     avfilter_graph_free(&graph);
 #endif
@@ -3371,8 +3460,9 @@ static int read_thread(void *arg)
             int64_t seek_max    = is->seek_rel < 0 ? seek_target - is->seek_rel - 2: INT64_MAX;
 // FIXME the +-2 is due to rounding being not done in the correct direction in generation
 //      of the seek_pos/seek_rel variables
-
-            ffp_toggle_buffering(ffp, 1);
+            if (!ffp->get_frame_mode) {
+                ffp_toggle_buffering(ffp, 1);
+            }
             ffp_notify_msg3(ffp, FFP_MSG_BUFFERING_UPDATE, 0, 0);
             ret = avformat_seek_file(is->ic, -1, seek_min, seek_target, seek_max, is->seek_flags);
             if (ret < 0) {
@@ -3443,7 +3533,9 @@ static int read_thread(void *arg)
             }
 
             ffp_notify_msg3(ffp, FFP_MSG_SEEK_COMPLETE, (int)fftime_to_milliseconds(seek_target), ret);
-            ffp_toggle_buffering(ffp, 1);
+            if (!ffp->get_frame_mode) {
+                ffp_toggle_buffering(ffp, 1);
+            }
         }
         if (is->queue_attachments_req) {
             if (is->video_st && (is->video_st->disposition & AV_DISPOSITION_ATTACHED_PIC)) {
@@ -3505,6 +3597,10 @@ static int read_thread(void *arg)
                         av_log(ffp, AV_LOG_INFO, "ffp_toggle_buffering: error: %d\n", ffp->error);
                         ffp_notify_msg1(ffp, FFP_MSG_ERROR);
                     } else {
+                        if (ffp->get_frame_mode && ffp->frame_output_info) {
+                            ffp_seek_to_l(ffp, 0);
+                            ffp->need_delete_task_time = ffp->frame_output_info->start_time;
+                        }
                         av_log(ffp, AV_LOG_INFO, "ffp_toggle_buffering: completed: OK\n");
                         ffp_notify_msg1(ffp, FFP_MSG_COMPLETED);
                     }
@@ -3684,6 +3780,13 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
         ffp->enable_accurate_seek = 0;
     }
 
+    if (ffp->get_frame_mode && !ffp->frame_output_cond) {
+        if (!(ffp->frame_output_cond = SDL_CreateCond())) {
+            av_log(NULL, AV_LOG_FATAL, "SDL_CreateCond(): %s\n", SDL_GetError());
+            goto fail;
+        }
+    }
+
     init_clock(&is->vidclk, &is->videoq.serial);
     init_clock(&is->audclk, &is->audioq.serial);
     init_clock(&is->extclk, &is->extclk.serial);
@@ -3700,6 +3803,12 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
 
     is->play_mutex = SDL_CreateMutex();
     is->accurate_seek_mutex = SDL_CreateMutex();
+    if (ffp->get_frame_mode && !ffp->frame_output_mutex) {
+        if (!(ffp->frame_output_mutex = SDL_CreateMutex())) {
+            av_log(NULL, AV_LOG_FATAL, "SDL_CreateMutex(): %s\n", SDL_GetError());
+            goto fail;
+        }
+    }
     ffp->is = is;
     is->pause_req = !ffp->start_on_prepared;
 
@@ -4007,6 +4116,21 @@ void ffp_destroy(FFPlayer *ffp)
         stream_close(ffp);
         ffp->is = NULL;
     }
+    if (ffp->get_frame_mode &&ffp->frame_output_info) {
+        if (ffp->frame_output_mutex) {
+            SDL_DestroyMutex(ffp->frame_output_mutex);
+        }
+        if (ffp->frame_output_cond) {
+            SDL_DestroyCond(ffp->frame_output_cond);
+        }
+        if (ffp->frame_output_info->frame_img_convert_ctx) {
+            sws_freeContext(ffp->frame_output_info->frame_img_convert_ctx);
+        }
+        if (ffp->frame_output_info->frame_img_codec_ctx) {
+            avcodec_free_context(&ffp->frame_output_info->frame_img_codec_ctx);
+        }
+        av_freep(&ffp->frame_output_info);
+    }
 
     SDL_VoutFreeP(&ffp->vout);
     SDL_AoutFreeP(&ffp->aout);
@@ -4093,35 +4217,59 @@ static int ijkio_app_func_event(IjkIOApplicationContext *h, int message ,void *d
     return 0;
 }
 
-void ffp_set_frame_at_time(FFPlayer *ffp, const char *path, int64_t start_time, int64_t end_time, int num, int definition) {
-    if (!ffp->get_img_info) {
-        ffp->get_img_info = av_mallocz(sizeof(GetImgInfo));
-        if (!ffp->get_img_info) {
-            ffp_notify_msg3(ffp, FFP_MSG_GET_IMG_STATE, 0, -1);
-            return;
+static int ffp_delete_frame_output_task(FFPlayer *ffp, int64_t start_time)
+{
+    ffp->need_delete_task_time = start_time;
+    return 0;
+}
+
+int ffp_add_frame_output_task(FFPlayer *ffp, const char *path, int64_t start_time, int frame_interval, int count, int definition, int frame_type) {
+    if (!ffp->frame_output_cond) {
+        if (!(ffp->frame_output_cond = SDL_CreateCond())) {
+            av_log(NULL, AV_LOG_FATAL, "SDL_CreateCond(): %s\n", SDL_GetError());
+            return -1;
         }
     }
 
-    if (start_time >= 0 && num > 0 && end_time >= 0 && end_time >= start_time) {
-        ffp->get_img_info->img_path   = av_strdup(path);
-        ffp->get_img_info->start_time = start_time;
-        ffp->get_img_info->end_time   = end_time;
-        ffp->get_img_info->num        = num;
-        ffp->get_img_info->count      = num;
-        if (definition== HD_IMAGE) {
-            ffp->get_img_info->width  = 640;
-            ffp->get_img_info->height = 360;
-        } else if (definition == SD_IMAGE) {
-            ffp->get_img_info->width  = 320;
-            ffp->get_img_info->height = 180;
-        } else {
-            ffp->get_img_info->width  = 160;
-            ffp->get_img_info->height = 90;
+    if (!ffp->frame_output_mutex) {
+        if (!(ffp->frame_output_mutex = SDL_CreateMutex())) {
+            av_log(NULL, AV_LOG_FATAL, "SDL_CreateMutex(): %s\n", SDL_GetError());
+            return -1;
         }
-    } else {
-        ffp->get_img_info->count = 0;
-        ffp_notify_msg3(ffp, FFP_MSG_GET_IMG_STATE, 0, -1);
     }
+    SDL_LockMutex(ffp->frame_output_mutex);
+
+    if (!ffp->frame_output_info) {
+        ffp->frame_output_info = av_mallocz(sizeof(FrameOutputTaskInfo));
+        if (!ffp->frame_output_info) {
+            av_log(NULL, AV_LOG_FATAL, "%s: av_mallocz frame_output_info error\n", __func__);
+            SDL_UnlockMutex(ffp->frame_output_mutex);
+            return -1;
+        }
+        ffp->frame_output_info->state = TASK_IDLE;
+    }
+
+    if (ffp->frame_output_info->state != TASK_IDLE) {
+        SDL_UnlockMutex(ffp->frame_output_mutex);
+        return -2;
+    }
+
+    if (path && (strlen(path) <= FRAME_OUTPUT_IMG_PATH_LEN) && start_time >= 0 && count > 0) {
+        strcpy(ffp->frame_output_info->img_path, path);
+        ffp->frame_output_info->start_time = start_time;
+        ffp->frame_output_info->count      = count;
+        ffp->frame_output_info->definition = definition;
+        ffp->frame_output_info->frame_type = frame_type;
+        ffp->frame_output_info->frame_interval = frame_interval;
+    } else {
+        SDL_UnlockMutex(ffp->frame_output_mutex);
+        return -3;
+    }
+
+    ffp->frame_output_info->state = TASK_WAIT_TODO;
+    SDL_CondSignal(ffp->frame_output_cond);
+    SDL_UnlockMutex(ffp->frame_output_mutex);
+    return 0;
 }
 
 void *ffp_set_ijkio_inject_opaque(FFPlayer *ffp, void *opaque)
@@ -4372,6 +4520,12 @@ int ffp_stop_l(FFPlayer *ffp)
         SDL_CondSignal(is->audio_accurate_seek_cond);
         SDL_CondSignal(is->video_accurate_seek_cond);
         SDL_UnlockMutex(is->accurate_seek_mutex);
+    }
+
+    if (ffp->get_frame_mode && ffp->frame_output_mutex && ffp->frame_output_cond) {
+        SDL_LockMutex(ffp->frame_output_mutex);
+        SDL_CondSignal(ffp->frame_output_cond);
+        SDL_UnlockMutex(ffp->frame_output_mutex);
     }
     return 0;
 }
@@ -5024,6 +5178,11 @@ void ffp_set_property_int64(FFPlayer *ffp, int id, int64_t value)
         case FFP_PROP_INT64_IMMEDIATE_RECONNECT:
             if (ffp) {
                 ijkio_manager_immediate_reconnect(ffp->ijkio_manager_ctx);
+            }
+            break;
+        case FFP_PROP_INT64_DELETE_FRAMEOUTPUT_TASK:
+            if (ffp) {
+                ffp_delete_frame_output_task(ffp, value);
             }
         default:
             break;
