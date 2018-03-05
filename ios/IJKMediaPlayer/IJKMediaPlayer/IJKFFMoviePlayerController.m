@@ -172,6 +172,11 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
     // [UIApplication sharedApplication].idleTimerDisabled = on;
 }
 
+- (void)configScreenOnFlag: (BOOL)on
+{
+    _keepScreenOnWhilePlaying = on;
+}
+
 - (id)initWithContentURLString:(NSString *)aUrlString
                    withOptions:(IJKFFOptions *)options
 {
@@ -252,7 +257,6 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
 
         // init extra
         _keepScreenOnWhilePlaying = YES;
-        [self setScreenOn:YES];
 
         _notificationManager = [[IJKNotificationManager alloc] init];
         [self registerApplicationObservers];
@@ -355,7 +359,6 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
 
         // init extra
         _keepScreenOnWhilePlaying = YES;
-        [self setScreenOn:YES];
 
         _notificationManager = [[IJKNotificationManager alloc] init];
         [self registerApplicationObservers];
