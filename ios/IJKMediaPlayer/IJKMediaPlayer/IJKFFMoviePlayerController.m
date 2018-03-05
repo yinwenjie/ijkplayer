@@ -34,7 +34,7 @@
 #import "ijkioapplication.h"
 #include "string.h"
 
-static const char *kIJKFFRequiredFFmpegVersion = "ff3.4--ijk0.8.7--20180301--001";
+static const char *kIJKFFRequiredFFmpegVersion = "ff3.4--ijk0.8.7--20180305--001";
 
 // It means you didn't call shutdown if you found this object leaked.
 @interface IJKWeakHolder : NSObject
@@ -172,6 +172,11 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
     // [UIApplication sharedApplication].idleTimerDisabled = on;
 }
 
+- (void)configScreenOnFlag: (BOOL)on
+{
+    _keepScreenOnWhilePlaying = on;
+}
+
 - (id)initWithContentURLString:(NSString *)aUrlString
                    withOptions:(IJKFFOptions *)options
 {
@@ -252,7 +257,6 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
 
         // init extra
         _keepScreenOnWhilePlaying = YES;
-        [self setScreenOn:YES];
 
         _notificationManager = [[IJKNotificationManager alloc] init];
         [self registerApplicationObservers];
@@ -355,7 +359,6 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
 
         // init extra
         _keepScreenOnWhilePlaying = YES;
-        [self setScreenOn:YES];
 
         _notificationManager = [[IJKNotificationManager alloc] init];
         [self registerApplicationObservers];

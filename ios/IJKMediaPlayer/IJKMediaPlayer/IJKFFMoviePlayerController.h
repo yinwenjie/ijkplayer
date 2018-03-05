@@ -99,6 +99,8 @@ typedef enum IJKLogLevel {
 
 - (void)setHudValue:(NSString *)value forKey:(NSString *)key;
 
+- (void)configScreenOnFlag:(BOOL)on;
+
 + (void)setLogReport:(BOOL)preferLogReport;
 + (void)setLogLevel:(IJKLogLevel)logLevel;
 + (BOOL)checkIfFFmpegVersionMatch:(BOOL)showAlert;
