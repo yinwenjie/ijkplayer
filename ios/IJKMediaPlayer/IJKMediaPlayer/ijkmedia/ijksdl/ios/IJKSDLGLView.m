@@ -29,7 +29,6 @@
 #include "ijksdl/ijksdl_gles2.h"
 
 typedef NS_ENUM(NSInteger, IJKSDLGLViewApplicationState) {
-    IJKSDLGLViewApplicationUnknownState = 0,
     IJKSDLGLViewApplicationForegroundState = 1,
     IJKSDLGLViewApplicationBackgroundState = 2
 };
@@ -37,6 +36,7 @@ typedef NS_ENUM(NSInteger, IJKSDLGLViewApplicationState) {
 @interface IJKSDLGLView()
 @property(atomic,strong) NSRecursiveLock *glActiveLock;
 @property(atomic) BOOL glActivePaused;
+@property(atomic) IJKSDLGLViewApplicationState glApplicationState;
 @end
 
 @implementation IJKSDLGLView {
@@ -61,8 +61,6 @@ typedef NS_ENUM(NSInteger, IJKSDLGLViewApplicationState) {
     BOOL            _didLockedDueToMovedToWindow;
     BOOL            _shouldLockWhileBeingMovedToWindow;
     NSMutableArray *_registeredNotifications;
-
-    IJKSDLGLViewApplicationState _applicationState;
 }
 
 @synthesize isThirdGLView              = _isThirdGLView;
@@ -83,9 +81,8 @@ typedef NS_ENUM(NSInteger, IJKSDLGLViewApplicationState) {
         self.glActiveLock = [[NSRecursiveLock alloc] init];
         _registeredNotifications = [[NSMutableArray alloc] init];
         [self registerApplicationObservers];
-
         _didSetupGL = NO;
-        if ([self isApplicationActive] == YES)
+        if ([self checkApplicationActive] == YES)
             [self setupGLOnce];
     }
 
@@ -195,24 +192,18 @@ typedef NS_ENUM(NSInteger, IJKSDLGLViewApplicationState) {
     return didSetupGL;
 }
 
-- (BOOL)isApplicationActive
+- (BOOL)checkApplicationActive
 {
-    switch (_applicationState) {
-        case IJKSDLGLViewApplicationForegroundState:
+    UIApplicationState appState = [UIApplication sharedApplication].applicationState;
+    switch (appState) {
+        case UIApplicationStateActive:
+            self.glApplicationState = IJKSDLGLViewApplicationForegroundState;
             return YES;
-        case IJKSDLGLViewApplicationBackgroundState:
+        case UIApplicationStateInactive:
+        case UIApplicationStateBackground:
+        default:
+            self.glApplicationState = IJKSDLGLViewApplicationBackgroundState;
             return NO;
-        default: {
-            UIApplicationState appState = [UIApplication sharedApplication].applicationState;
-            switch (appState) {
-                case UIApplicationStateActive:
-                    return YES;
-                case UIApplicationStateInactive:
-                case UIApplicationStateBackground:
-                default:
-                    return NO;
-            }
-        }
     }
 }
 
@@ -337,14 +328,16 @@ typedef NS_ENUM(NSInteger, IJKSDLGLViewApplicationState) {
     if (_didSetupGL == NO)
         return;
 
-    if ([self isApplicationActive] == NO)
-        return;
-
     if (![self tryLockGLActive]) {
         if (0 == (_tryLockErrorCount % 100)) {
             NSLog(@"IJKSDLGLView:display: unable to tryLock GL active: %d\n", _tryLockErrorCount);
         }
         _tryLockErrorCount++;
+        return;
+    }
+
+    if (self.glApplicationState == IJKSDLGLViewApplicationBackgroundState) {
+        [self unlockGLActive];
         return;
     }
 
@@ -500,14 +493,15 @@ typedef NS_ENUM(NSInteger, IJKSDLGLViewApplicationState) {
 - (void)applicationWillEnterForeground
 {
     NSLog(@"IJKSDLGLView:applicationWillEnterForeground: %d", (int)[UIApplication sharedApplication].applicationState);
+    self.glApplicationState = IJKSDLGLViewApplicationForegroundState;
     [self setupGLOnce];
-    _applicationState = IJKSDLGLViewApplicationForegroundState;
     [self toggleGLPaused:NO];
 }
 
 - (void)applicationDidBecomeActive
 {
     NSLog(@"IJKSDLGLView:applicationDidBecomeActive: %d", (int)[UIApplication sharedApplication].applicationState);
+    self.glApplicationState = IJKSDLGLViewApplicationForegroundState;
     [self setupGLOnce];
     [self toggleGLPaused:NO];
 }
@@ -515,6 +509,9 @@ typedef NS_ENUM(NSInteger, IJKSDLGLViewApplicationState) {
 - (void)applicationWillResignActive
 {
     NSLog(@"IJKSDLGLView:applicationWillResignActive: %d", (int)[UIApplication sharedApplication].applicationState);
+    [self lockGLActive];
+    self.glApplicationState = IJKSDLGLViewApplicationBackgroundState;
+    [self unlockGLActive];
     [self toggleGLPaused:YES];
     glFinish();
 }
@@ -522,7 +519,9 @@ typedef NS_ENUM(NSInteger, IJKSDLGLViewApplicationState) {
 - (void)applicationDidEnterBackground
 {
     NSLog(@"IJKSDLGLView:applicationDidEnterBackground: %d", (int)[UIApplication sharedApplication].applicationState);
-    _applicationState = IJKSDLGLViewApplicationBackgroundState;
+    [self lockGLActive];
+    self.glApplicationState = IJKSDLGLViewApplicationBackgroundState;
+    [self unlockGLActive];
     [self toggleGLPaused:YES];
     glFinish();
 }
