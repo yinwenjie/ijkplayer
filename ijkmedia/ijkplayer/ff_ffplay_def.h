@@ -152,7 +152,7 @@ static unsigned sws_flags = SWS_BICUBIC;
 
 enum FrameOutputTaskStatus {
     TASK_IDLE = -1, TASK_WAIT_TODO = 0, TASK_DOING = 1
-} frame_output_task_status;
+};
 
 typedef struct FrameOutputTaskInfo {
     char img_path[FRAME_OUTPUT_IMG_PATH_LEN];
