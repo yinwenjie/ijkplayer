@@ -1,6 +1,11 @@
 tag next
 --------------------------------
 
+tag k0.8.9
+--------------------------------
+- ffmpeg: add ijk protocol
+- ijkplay: fix some bug about frame output
+
 tag k0.8.8
 --------------------------------
 - ffmpeg: upgrade to 3.4
