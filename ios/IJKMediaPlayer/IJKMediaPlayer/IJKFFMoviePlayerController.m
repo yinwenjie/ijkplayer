@@ -813,6 +813,18 @@ inline static NSString *formatedSpeed(int64_t bytes, int64_t elapsed_milli) {
     }
 }
 
+- (float)getVdecFps {
+    return ijkmp_get_property_float(_mediaPlayer, FFP_PROP_FLOAT_VIDEO_DECODE_FRAMES_PER_SECOND, .0f);
+}
+
+- (float)getVrenderFps {
+    return ijkmp_get_property_float(_mediaPlayer, FFP_PROP_FLOAT_VIDEO_OUTPUT_FRAMES_PER_SECOND, .0f);
+}
+
+- (int64_t)getTcpSpeed {
+    return ijkmp_get_property_int64(_mediaPlayer, FFP_PROP_INT64_TCP_SPEED, 0);
+}
+
 - (void)refreshHudView
 {
     if (_mediaPlayer == nil)
