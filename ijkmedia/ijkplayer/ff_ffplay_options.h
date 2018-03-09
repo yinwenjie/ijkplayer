@@ -164,6 +164,8 @@ static const AVOption ffp_context_options[] = {
         OPTION_OFFSET(async_init_decoder),   OPTION_INT(0, 0, 1) },
     { "video-mime-type",                    "default video mime type",
         OPTION_OFFSET(video_mime_type),     OPTION_STR(NULL) },
+    { "hw-decode-fallback-enable",          "try fallback to ffplay decoder when hw decode fail",
+        OPTION_OFFSET(hw_decode_fallback_enable),      OPTION_INT(0, 0, 1) },
 
         // iOS only options
     { "videotoolbox",                       "VideoToolbox: enable",
