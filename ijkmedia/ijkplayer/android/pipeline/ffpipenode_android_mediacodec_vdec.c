@@ -52,6 +52,7 @@
 
 #define ACODEC_RETRY -1
 #define ACODEC_EXIT  -2
+#define PKG_BAK_QUEUE_MAX  100
 
 typedef struct AMC_Buf_Out {
     int port;
@@ -118,6 +119,7 @@ typedef struct IJKFF_Pipenode_Opaque {
 
     SDL_SpeedSampler          sampler;
     volatile bool             abort;
+    volatile bool             acodec_decodec_succeed;
 } IJKFF_Pipenode_Opaque;
 
 static SDL_AMediaCodec *create_codec_l(JNIEnv *env, IJKFF_Pipenode *node)
@@ -754,8 +756,27 @@ static int feed_input_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, 
                 d->next_pts_tb = d->start_pts_tb;
             }
         } while (ffp_is_flush_packet(&pkt) || d->queue->serial != d->pkt_serial);
+
+        if (ffp->hw_decode_fallback_enable) {
+            if (!opaque->acodec_decodec_succeed) {
+                if (ffp_packet_queue_nb(d->queue_bak) < PKG_BAK_QUEUE_MAX) {
+                    ffp_packet_queue_put(d->queue_bak, &pkt);
+                } else {
+                    ret = -1;
+                    goto fail;
+                }
+            } else {
+                if (ffp_packet_queue_nb(d->queue_bak) > 0) {
+                    ffp_packet_queue_flush(d->queue_bak);
+                } else {
+                    av_packet_unref(&d->pkt);
+                }
+            }
+        } else {
+            av_packet_unref(&d->pkt);
+        }
+
         av_packet_split_side_data(&pkt);
-        av_packet_unref(&d->pkt);
         d->pkt_temp = d->pkt = pkt;
         d->packet_pending = 1;
 
@@ -1042,6 +1063,7 @@ static int enqueue_thread_func(void *arg)
     ret = 0;
 fail:
     SDL_AMediaCodecFake_abort(opaque->acodec);
+    opaque->abort = true;
     ALOGI("MediaCodec: %s: exit: %d", __func__, ret);
     return ret;
 }
@@ -1145,9 +1167,13 @@ static int drain_output_buffer_l(JNIEnv *env, IJKFF_Pipenode *node, int64_t time
         AMCTRACE("AMEDIACODEC__INFO_TRY_AGAIN_LATER\n");
         // continue;
     } else if (output_buffer_index < 0) {
-        SDL_LockMutex(opaque->any_input_mutex);
-        SDL_CondWaitTimeout(opaque->any_input_cond, opaque->any_input_mutex, 1000);
-        SDL_UnlockMutex(opaque->any_input_mutex);
+        if (output_buffer_index != AMEDIACODEC__UNKNOWN_ERROR || !ffp->hw_decode_fallback_enable) {
+            SDL_LockMutex(opaque->any_input_mutex);
+            SDL_CondWaitTimeout(opaque->any_input_cond, opaque->any_input_mutex, 1000);
+            SDL_UnlockMutex(opaque->any_input_mutex);
+        } else {
+            ret = output_buffer_index;
+        }
 
         goto done;
     } else if (output_buffer_index >= 0) {
@@ -1244,7 +1270,7 @@ static int drain_output_buffer_l(JNIEnv *env, IJKFF_Pipenode *node, int64_t time
 done:
     if (opaque->decoder->queue->abort_request)
         ret = -1;
-    else
+    else if (ret != AMEDIACODEC__UNKNOWN_ERROR)
         ret = 0;
 fail:
     return ret;
@@ -1589,6 +1615,7 @@ static int func_run_sync(IJKFF_Pipenode *node)
     if (!frame)
         goto fail;
 
+    opaque->acodec_decodec_succeed = false;
     opaque->enqueue_thread = SDL_CreateThreadEx(&opaque->_enqueue_thread, enqueue_thread_func, node, "amediacodec_input_thread");
     if (!opaque->enqueue_thread) {
         ALOGE("%s: SDL_CreateThreadEx failed\n", __func__);
@@ -1596,7 +1623,7 @@ static int func_run_sync(IJKFF_Pipenode *node)
         goto fail;
     }
 
-    while (!q->abort_request) {
+    while (!q->abort_request && !opaque->abort) {
         int64_t timeUs = opaque->acodec_first_dequeue_output_request ? 0 : AMC_OUTPUT_TIMEOUT_US;
         got_frame = 0;
         ret = drain_output_buffer(env, node, timeUs, &dequeue_count, frame, &got_frame);
@@ -1607,13 +1634,17 @@ static int func_run_sync(IJKFF_Pipenode *node)
             SDL_UnlockMutex(opaque->acodec_first_dequeue_output_mutex);
         }
         if (ret != 0) {
-            ret = -1;
+            if (ret != AMEDIACODEC__UNKNOWN_ERROR) {
+                ret = -1;
+            }
             if (got_frame && frame->opaque)
                 SDL_VoutAndroid_releaseBufferProxyP(opaque->weak_vout, (SDL_AMediaCodecBufferProxy **)&frame->opaque, false);
             goto fail;
         }
         if (got_frame) {
             duration = (frame_rate.num && frame_rate.den ? av_q2d((AVRational){frame_rate.den, frame_rate.num}) : 0);
+            opaque->acodec_decodec_succeed = true;
+
             pts = (frame->pts == AV_NOPTS_VALUE) ? NAN : frame->pts * av_q2d(tb);
             if (ffp->framedrop > 0 || (ffp->framedrop && ffp_get_master_sync_type(is) != AV_SYNC_VIDEO_MASTER)) {
                 ffp->stat.decode_frame_count++;
@@ -1668,7 +1699,13 @@ fail:
     }
     SDL_AMediaCodec_stop(opaque->acodec);
     SDL_AMediaCodec_decreaseReferenceP(&opaque->acodec);
+    if (ret == AMEDIACODEC__UNKNOWN_ERROR && !opaque->acodec_decodec_succeed && ffp->hw_decode_fallback_enable) {
+        ALOGW("%s MediaCodec:AMEDIACODEC__UNKNOWN_ERROR error will try fallback to ffplay decoder", __func__);
+        ffp_video_thread(ffp);
+    }
+
     ALOGI("MediaCodec: %s: exit: %d", __func__, ret);
+
     return ret;
 #if 0
 fallback_to_ffplay:
