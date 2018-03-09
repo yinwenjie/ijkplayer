@@ -150,6 +150,8 @@ static unsigned sws_flags = SWS_BICUBIC;
 #define MAX_DEVIATION 1200000   // 1200ms
 #define FRAME_OUTPUT_IMG_PATH_LEN 1024
 
+#define UNKNOWN_FINISH -10001
+
 enum FrameOutputTaskStatus {
     TASK_IDLE = -1, TASK_WAIT_TODO = 0, TASK_DOING = 1
 };
@@ -266,6 +268,7 @@ typedef struct Decoder {
     AVPacket pkt;
     AVPacket pkt_temp;
     PacketQueue *queue;
+    PacketQueue *queue_bak;
     AVCodecContext *avctx;
     int pkt_serial;
     int finished;
@@ -378,6 +381,7 @@ typedef struct VideoState {
     int video_stream;
     AVStream *video_st;
     PacketQueue videoq;
+    PacketQueue videoq_bak;
     double max_frame_duration;      // maximum duration of a frame - above this, we consider the jump a timestamp discontinuity
     struct SwsContext *img_convert_ctx;
 #ifdef FFP_SUB
@@ -737,6 +741,7 @@ typedef struct FFPlayer {
     int need_delete_task_time;
     SDL_mutex *frame_output_mutex;
     SDL_cond  *frame_output_cond;
+    int hw_decode_fallback_enable;
 } FFPlayer;
 
 #define fftime_to_milliseconds(ts) (av_rescale(ts, 1000, AV_TIME_BASE))
@@ -848,6 +853,7 @@ inline static void ffp_reset_internal(FFPlayer *ffp)
     ffp->ijkmeta_delay_init             = 0; // option
     ffp->render_wait_start              = 0;
     ffp->need_delete_task_time          = -1;
+    ffp->hw_decode_fallback_enable      = 0;
 
     ijkmeta_reset(ffp->meta);
 

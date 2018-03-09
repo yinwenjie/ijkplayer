@@ -145,7 +145,7 @@ static int packet_queue_put_private(PacketQueue *q, AVPacket *pkt)
     MyAVPacketList *pkt1;
 
     if (q->abort_request)
-       return -1;
+        return -1;
 
 #ifdef FFP_MERGE
     pkt1 = av_malloc(sizeof(MyAVPacketList));
@@ -598,6 +598,10 @@ fail0:
 
 static int decoder_decode_frame(FFPlayer *ffp, Decoder *d, AVFrame *frame, AVSubtitle *sub) {
     int ret = AVERROR(EAGAIN);
+    AVPacket pkt_null = {0};
+    if (ffp->hw_decode_fallback_enable && (d->avctx->codec_type == AVMEDIA_TYPE_VIDEO) && (ffp_packet_queue_nb(d->queue_bak) > 0)) {
+        d->pkt_temp = d->pkt = pkt_null;
+    }
 
     for (;;) {
         AVPacket pkt;
@@ -653,8 +657,14 @@ static int decoder_decode_frame(FFPlayer *ffp, Decoder *d, AVFrame *frame, AVSub
                 av_packet_move_ref(&pkt, &d->pkt);
                 d->packet_pending = 0;
             } else {
-                if (packet_queue_get_or_buffering(ffp, d->queue, &pkt, &d->pkt_serial, &d->finished) < 0)
-                    return -1;
+                if (ffp->hw_decode_fallback_enable && (d->avctx->codec_type == AVMEDIA_TYPE_VIDEO) && (ffp_packet_queue_nb(d->queue_bak) > 0)) {
+                    int finished = UNKNOWN_FINISH;
+                    if (packet_queue_get_or_buffering(ffp, d->queue_bak, &pkt, &d->pkt_serial, &finished) < 0)
+                        return -1;
+                } else {
+                    if (packet_queue_get_or_buffering(ffp, d->queue, &pkt, &d->pkt_serial, &d->finished) < 0)
+                        return -1;
+                }
             }
         } while (d->queue->serial != d->pkt_serial);
 
@@ -838,6 +848,9 @@ static void decoder_abort(Decoder *d, FrameQueue *fq)
     SDL_WaitThread(d->decoder_tid, NULL);
     d->decoder_tid = NULL;
     packet_queue_flush(d->queue);
+    if (d->queue_bak) {
+        packet_queue_flush(d->queue_bak);
+    }
 }
 
 // FFP_MERGE: fill_rectangle
@@ -1033,6 +1046,7 @@ static void stream_close(FFPlayer *ffp)
     is->abort_request = 1;
     packet_queue_abort(&is->videoq);
     packet_queue_abort(&is->audioq);
+    packet_queue_abort(&is->videoq_bak);
     av_log(NULL, AV_LOG_DEBUG, "wait for read_tid\n");
     SDL_WaitThread(is->read_tid, NULL);
 
@@ -1052,6 +1066,7 @@ static void stream_close(FFPlayer *ffp)
     packet_queue_destroy(&is->videoq);
     packet_queue_destroy(&is->audioq);
     packet_queue_destroy(&is->subtitleq);
+    packet_queue_destroy(&is->videoq_bak);
 
     /* free all pictures */
     frame_queue_destory(&is->pictq);
@@ -3047,16 +3062,19 @@ static int stream_component_open(FFPlayer *ffp, int stream_index)
             }
             if (ret || !ffp->node_vdec) {
                 decoder_init(&is->viddec, avctx, &is->videoq, is->continue_read_thread);
+                is->viddec.queue_bak = &is->videoq_bak;
                 ffp->node_vdec = ffpipeline_open_video_decoder(ffp->pipeline, ffp);
                 if (!ffp->node_vdec)
                     goto fail;
             }
         } else {
             decoder_init(&is->viddec, avctx, &is->videoq, is->continue_read_thread);
+            is->viddec.queue_bak = &is->videoq_bak;
             ffp->node_vdec = ffpipeline_open_video_decoder(ffp->pipeline, ffp);
             if (!ffp->node_vdec)
                 goto fail;
         }
+        packet_queue_start(&is->videoq_bak);
         if ((ret = decoder_start(&is->viddec, video_thread, ffp, "ff_video_dec")) < 0)
             goto out;
 
@@ -3487,6 +3505,7 @@ static int read_thread(void *arg)
                     }
                     packet_queue_flush(&is->videoq);
                     packet_queue_put(&is->videoq, &flush_pkt);
+                    packet_queue_flush(&is->videoq_bak);
                 }
                 if (is->seek_flags & AVSEEK_FLAG_BYTE) {
                    set_clock(&is->extclk, NAN, 0);
@@ -3764,7 +3783,8 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
 
     if (packet_queue_init(&is->videoq) < 0 ||
         packet_queue_init(&is->audioq) < 0 ||
-        packet_queue_init(&is->subtitleq) < 0)
+        packet_queue_init(&is->subtitleq) < 0 ||
+        packet_queue_init(&is->videoq_bak) < 0)
         goto fail;
 
     if (!(is->continue_read_thread = SDL_CreateCond())) {
@@ -3831,6 +3851,7 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
                     && ffp->mediacodec_default_name && strlen(ffp->mediacodec_default_name) > 0) {
         if (ffp->mediacodec_all_videos || ffp->mediacodec_avc || ffp->mediacodec_hevc || ffp->mediacodec_mpeg2) {
             decoder_init(&is->viddec, NULL, &is->videoq, is->continue_read_thread);
+            is->viddec.queue_bak = &is->videoq_bak;
             ffp->node_vdec = ffpipeline_init_video_decoder(ffp->pipeline, ffp);
         }
     }
@@ -4685,6 +4706,11 @@ int ffp_packet_queue_get_or_buffering(FFPlayer *ffp, PacketQueue *q, AVPacket *p
 int ffp_packet_queue_put(PacketQueue *q, AVPacket *pkt)
 {
     return packet_queue_put(q, pkt);
+}
+
+int ffp_packet_queue_nb(PacketQueue *q)
+{
+    return q->nb_packets;
 }
 
 bool ffp_is_flush_packet(AVPacket *pkt)
