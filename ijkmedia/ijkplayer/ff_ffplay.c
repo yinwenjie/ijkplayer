@@ -5184,6 +5184,10 @@ int64_t ffp_get_property_int64(FFPlayer *ffp, int id, int64_t default_value)
             if (!ffp)
                 return default_value;
             return ffp->stat.logical_file_size;
+        case FFP_PROP_INT64_HW_DECODEC_ERROR_CODE:
+            if (!ffp)
+                return default_value;
+            return ffp->hw_decode_error_code;
         default:
             return default_value;
     }
