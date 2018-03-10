@@ -54,6 +54,10 @@
 #define ACODEC_EXIT  -2
 #define PKG_BAK_QUEUE_MAX  100
 
+#define MEDIACODEC_OUTPUT_ERROR -1
+#define MEDIACODEC_INPUT_ERROR -2
+#define MEDIACODEC_CREATE_ERROR -3
+
 typedef struct AMC_Buf_Out {
     int port;
     int acodec_serial;
@@ -986,6 +990,7 @@ static int feed_input_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, 
 
             copy_size = SDL_AMediaCodec_writeInputData(opaque->acodec, input_buffer_index, d->pkt_temp.data, d->pkt_temp.size);
             if (!copy_size) {
+                ffp->hw_decode_error_code = MEDIACODEC_INPUT_ERROR;
                 ALOGE("%s: SDL_AMediaCodec_getInputBuffer failed\n", __func__);
                 ret = -1;
                 goto fail;
@@ -1003,6 +1008,7 @@ static int feed_input_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, 
         // ALOGE("queueInputBuffer, %lld\n", time_stamp);
         amc_ret = SDL_AMediaCodec_queueInputBuffer(opaque->acodec, input_buffer_index, 0, copy_size, time_stamp, queue_flags);
         if (amc_ret != SDL_AMEDIA_OK) {
+            ffp->hw_decode_error_code = MEDIACODEC_INPUT_ERROR;
             ALOGE("%s: SDL_AMediaCodec_getInputBuffer failed\n", __func__);
             ret = -1;
             goto fail;
@@ -1167,6 +1173,9 @@ static int drain_output_buffer_l(JNIEnv *env, IJKFF_Pipenode *node, int64_t time
         AMCTRACE("AMEDIACODEC__INFO_TRY_AGAIN_LATER\n");
         // continue;
     } else if (output_buffer_index < 0) {
+        if (output_buffer_index == AMEDIACODEC__UNKNOWN_ERROR) {
+            ffp->hw_decode_error_code = MEDIACODEC_OUTPUT_ERROR;
+        }
         if (output_buffer_index != AMEDIACODEC__UNKNOWN_ERROR || !ffp->hw_decode_fallback_enable) {
             SDL_LockMutex(opaque->any_input_mutex);
             SDL_CondWaitTimeout(opaque->any_input_cond, opaque->any_input_mutex, 1000);
@@ -1870,6 +1879,7 @@ int ffpipenode_config_from_android_mediacodec(FFPlayer *ffp, IJKFF_Pipeline *pip
 
 fail:
     ret = -1;
+    ffp->hw_decode_error_code = MEDIACODEC_CREATE_ERROR;
     ffpipenode_free_p(&node);
     return ret;
 }
@@ -2118,6 +2128,7 @@ IJKFF_Pipenode *ffpipenode_create_video_decoder_from_android_mediacodec(FFPlayer
     ffp->stat.vdec_type = FFP_PROPV_DECODER_MEDIACODEC;
     return node;
 fail:
+    ffp->hw_decode_error_code = MEDIACODEC_CREATE_ERROR;
     ffpipenode_free_p(&node);
     return NULL;
 }
