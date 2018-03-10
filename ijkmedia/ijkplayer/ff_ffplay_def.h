@@ -742,6 +742,7 @@ typedef struct FFPlayer {
     SDL_mutex *frame_output_mutex;
     SDL_cond  *frame_output_cond;
     int hw_decode_fallback_enable;
+    int hw_decode_error_code;
 } FFPlayer;
 
 #define fftime_to_milliseconds(ts) (av_rescale(ts, 1000, AV_TIME_BASE))
@@ -854,6 +855,7 @@ inline static void ffp_reset_internal(FFPlayer *ffp)
     ffp->render_wait_start              = 0;
     ffp->need_delete_task_time          = -1;
     ffp->hw_decode_fallback_enable      = 0;
+    ffp->hw_decode_error_code           = 0;
 
     ijkmeta_reset(ffp->meta);
 
