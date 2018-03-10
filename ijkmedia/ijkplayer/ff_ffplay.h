@@ -81,6 +81,7 @@ void      ffp_packet_queue_flush(PacketQueue *q);
 int       ffp_packet_queue_get(PacketQueue *q, AVPacket *pkt, int block, int *serial);
 int       ffp_packet_queue_get_or_buffering(FFPlayer *ffp, PacketQueue *q, AVPacket *pkt, int *serial, int *finished);
 int       ffp_packet_queue_put(PacketQueue *q, AVPacket *pkt);
+int       ffp_packet_queue_nb(PacketQueue *q);
 bool      ffp_is_flush_packet(AVPacket *pkt);
 
 Frame    *ffp_frame_queue_peek_writable(FrameQueue *f);
