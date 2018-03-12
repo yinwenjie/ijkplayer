@@ -124,6 +124,7 @@ typedef struct IJKFF_Pipenode_Opaque {
     SDL_SpeedSampler          sampler;
     volatile bool             abort;
     volatile bool             acodec_decodec_succeed;
+    volatile bool             enable_hw_queue_bak;
 } IJKFF_Pipenode_Opaque;
 
 static SDL_AMediaCodec *create_codec_l(JNIEnv *env, IJKFF_Pipenode *node)
@@ -761,13 +762,13 @@ static int feed_input_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, 
             }
         } while (ffp_is_flush_packet(&pkt) || d->queue->serial != d->pkt_serial);
 
-        if (ffp->hw_decode_fallback_enable) {
+        if (ffp->hw_decode_fallback_enable && opaque->enable_hw_queue_bak) {
             if (!opaque->acodec_decodec_succeed) {
                 if (ffp_packet_queue_nb(d->queue_bak) < PKG_BAK_QUEUE_MAX) {
                     ffp_packet_queue_put(d->queue_bak, &pkt);
                 } else {
-                    ret = -1;
-                    goto fail;
+                    opaque->enable_hw_queue_bak = false;
+                    ffp_packet_queue_flush(d->queue_bak);
                 }
             } else {
                 if (ffp_packet_queue_nb(d->queue_bak) > 0) {
@@ -1053,6 +1054,12 @@ static int enqueue_thread_func(void *arg)
     PacketQueue           *q        = d->queue;
     int                    ret      = -1;
     int                    dequeue_count = 0;
+
+    if (ffp->hw_decode_fallback_enable) {
+        opaque->enable_hw_queue_bak = true;
+    } else {
+        opaque->enable_hw_queue_bak = false;
+    }
 
     if (JNI_OK != SDL_JNI_SetupThreadEnv(&env)) {
         ALOGE("%s: SetupThreadEnv failed\n", __func__);
