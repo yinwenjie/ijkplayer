@@ -72,6 +72,16 @@ typedef struct VTBFormatDesc
     bool                        convert_3byteTo4byteNALSize;
 } VTBFormatDesc;
 
+typedef struct Switching_Point_Context {
+    uint8_t                    *sps_buf;
+    uint8_t                    *pps_buf;
+    size_t                      sps_len;
+    size_t                      pps_len;
+    int                         orig_width;
+    int                         orig_height;
+    int                         switchig_ptr_cnt;
+} Switching_Point_Context;
+
 struct Ijk_VideoToolBox_Opaque {
     FFPlayer                   *ffp;
     VTDecompressionSessionRef   vt_session;
@@ -100,10 +110,12 @@ struct Ijk_VideoToolBox_Opaque {
     int                         serial;
     bool                        dealloced;
 
+    Switching_Point_Context     switching_ctx;
 };
 
 static void vtbformat_destroy(VTBFormatDesc *fmt_desc);
 static int  vtbformat_init(VTBFormatDesc *fmt_desc, AVCodecParameters *codecpar);
+static int vtbformat_init_with_param_sets(VTBFormatDesc *fmt_desc, AVCodecParameters *codecpar, uint8_t *sps, size_t sps_size, uint8_t *pps, size_t pps_size);
 
 static const char *vtb_get_error_string(OSStatus status) {
     switch (status) {
@@ -444,6 +456,7 @@ static VTDecompressionSessionRef vtbsession_create(Ijk_VideoToolBox_Opaque* cont
                           kCVPixelBufferHeightKey, height);
     CFDictionarySetBoolean(destinationPixelBufferAttributes,
                           kCVPixelBufferOpenGLESCompatibilityKey, YES);
+    
     outputCallback.decompressionOutputCallback = VTDecoderCallback;
     outputCallback.decompressionOutputRefCon = context  ;
     status = VTDecompressionSessionCreate(
@@ -466,7 +479,207 @@ static VTDecompressionSessionRef vtbsession_create(Ijk_VideoToolBox_Opaque* cont
     return vt_session;
 }
 
+static int check_param_set_in_idr_packet(Ijk_VideoToolBox_Opaque* context, const AVPacket *avpkt)
+{
+    uint8_t *pData = avpkt->data;
+    uint8_t nalu_type = pData[4] & 31, sps_flag = 0, pps_flag = 0, idr_flag = 0;
+    uint32_t nalu_size = 0, packet_size = avpkt->size, offset = 0;
+    
+    while (offset < packet_size) {
+        nalu_size = ((((const uint8_t*)(pData))[offset] << 24) | (((const uint8_t*)(pData))[offset+1] << 16) | (((const uint8_t*)(pData))[offset+2] <<  8) | ((const uint8_t*)(pData))[offset+3]);
+        offset += 4;
+        nalu_type = pData[offset] & 31;
+        switch (nalu_type) {
+            case 7:
+                sps_flag = 1;
+                break;
+            case 8:
+                pps_flag = 1;
+                break;
+            case 5:
+                idr_flag = 1;
+                break;
+            default:
+                break;
+        }
+        offset += nalu_size;
+    }
+    
+    if (sps_flag && pps_flag && idr_flag) {
+        return 1;
+    } else if ((sps_flag && !pps_flag) || (!sps_flag && pps_flag)) {
+        ALOGI("%s - Error: incomplete param sets in IDR packets.", __FUNCTION__);
+        return -1;
+    } else if (!idr_flag && sps_flag && pps_flag) {
+        ALOGI("%s - Warning: No IDR in header packets.", __FUNCTION__);
+        return 0;
+    }
+    
+    return 0;
+}
 
+static int demux_param_sets_from_packet(Ijk_VideoToolBox_Opaque* context, const AVPacket *avpkt) {
+    uint8_t *pData = avpkt->data;
+    int packet_size = avpkt->size;
+    int offset = 0, nal_type = 0, nalu_size = 0, total_size = 0;
+    
+    // clear old param set data, if necessary...
+    if (context->switching_ctx.sps_buf) {
+        free(context->switching_ctx.sps_buf);
+        context->switching_ctx.sps_buf = NULL;
+        context->switching_ctx.sps_len = 0;
+    }
+    if (context->switching_ctx.pps_buf) {
+        free(context->switching_ctx.pps_buf);
+        context->switching_ctx.pps_buf = NULL;
+        context->switching_ctx.pps_len = 0;
+    }
+
+    // get sps/pps data
+    while (total_size < packet_size) {
+        nalu_size = ((((const uint8_t*)(pData))[offset] << 24) | (((const uint8_t*)(pData))[offset+1] << 16) | (((const uint8_t*)(pData))[offset+2] <<  8) | ((const uint8_t*)(pData))[offset+3]);
+        offset += 4;
+        nal_type = pData[offset] & 31;
+        switch (nal_type) {
+            case 7:
+                context->switching_ctx.sps_len = nalu_size;
+                context->switching_ctx.sps_buf = (uint8_t *)av_malloc(nalu_size);
+                memcpy(context->switching_ctx.sps_buf, pData + offset, context->switching_ctx.sps_len);
+                break;
+            case 8:
+                context->switching_ctx.pps_len = nalu_size;
+                context->switching_ctx.pps_buf = (uint8_t *)av_malloc(nalu_size);
+                memcpy(context->switching_ctx.pps_buf, pData + offset, context->switching_ctx.pps_len);
+                break;
+            default:
+                break;
+        }
+        offset += nalu_size;
+        if (context->switching_ctx.sps_len && context->switching_ctx.pps_len) {
+            break;
+        }
+    }
+
+    return 1;
+}
+
+static VTDecompressionSessionRef recreate_vtbsession_with_param_sets(Ijk_VideoToolBox_Opaque* context, const AVPacket *avpkt)
+{
+    FFPlayer *ffp = context->ffp;
+    int width  = 0, height = 0;
+    VTDecompressionSessionRef vt_session = context->vt_session;
+    CFMutableDictionaryRef destinationPixelBufferAttributes;
+    VTDecompressionOutputCallbackRecord outputCallback;
+    OSStatus status;
+    
+    sps_info_struct sps_info = {0};
+    
+    uint8_t *pData = avpkt->data;
+    int ret = 0;
+
+    demux_param_sets_from_packet(context, avpkt);
+
+    sps_info = parseh264_sps(context->switching_ctx.sps_buf + 1, (uint32_t)context->switching_ctx.sps_len - 1);
+    width = (int)((sps_info.pic_width_in_mbs_minus1 + 1) * 16);
+    height = (int)((sps_info.pic_height_in_map_units_minus1 + 1) * 16);
+    pData = pData + 4 + context->switching_ctx.sps_len;
+
+/*    if (vt_session && (width == context->switching_ctx.orig_width) && (height == context->switching_ctx.orig_height)) {
+        goto end;
+    }
+    
+    vtbsession_destroy(context);
+    vtbformat_destroy(&context->fmt_desc);*/
+    ret = vtbformat_init_with_param_sets(&context->fmt_desc, context->codecpar, context->switching_ctx.sps_buf, context->switching_ctx.sps_len, context->switching_ctx.pps_buf, context->switching_ctx.pps_len);
+    if (ret < 0) {
+        goto end;
+    }
+
+    if (vt_session && VTDecompressionSessionCanAcceptFormatDescription(context->vt_session, context->fmt_desc.fmt_desc)) {
+        goto end;
+    }
+    
+    if (ffp->vtb_max_frame_width > 0 && width > ffp->vtb_max_frame_width) {
+        double w_scaler = (float)ffp->vtb_max_frame_width / width;
+        width = ffp->vtb_max_frame_width;
+        height = height * w_scaler;
+    }
+
+    ALOGI("after scale width %d height %d \n", width, height);
+    
+    destinationPixelBufferAttributes = CFDictionaryCreateMutable(
+                                                                 NULL,
+                                                                 0,
+                                                                 &kCFTypeDictionaryKeyCallBacks,
+                                                                 &kCFTypeDictionaryValueCallBacks);
+    CFDictionarySetSInt32(destinationPixelBufferAttributes,
+                          kCVPixelBufferPixelFormatTypeKey, kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange);
+    CFDictionarySetSInt32(destinationPixelBufferAttributes,
+                          kCVPixelBufferWidthKey, width);
+    CFDictionarySetSInt32(destinationPixelBufferAttributes,
+                          kCVPixelBufferHeightKey, height);
+    CFDictionarySetSInt32(destinationPixelBufferAttributes,
+                          kCVPixelBufferPixelFormatTypeKey, kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange);
+    CFDictionarySetBoolean(destinationPixelBufferAttributes,
+                           kCVPixelBufferOpenGLESCompatibilityKey, YES);
+    outputCallback.decompressionOutputCallback = VTDecoderCallback;
+    outputCallback.decompressionOutputRefCon = context  ;
+
+    status = VTDecompressionSessionCreate(
+                                          kCFAllocatorDefault,
+                                          context->fmt_desc.fmt_desc,
+                                          NULL,
+                                          destinationPixelBufferAttributes,
+                                          &outputCallback,
+                                          &vt_session);
+    
+    if (status != noErr) {
+        NSError* error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status userInfo:nil];
+        NSLog(@"Error %@", [error description]);
+        ALOGI("%s - failed with status = (%d)", __FUNCTION__, (int)status);
+    }
+
+    CFRelease(destinationPixelBufferAttributes);
+    
+    memset(&context->sample_info, 0, sizeof(struct sample_info));
+    context->switching_ctx.orig_width = width;
+    context->switching_ctx.orig_height = height;
+    
+end:
+    if (context->switching_ctx.sps_buf) {
+        free(context->switching_ctx.sps_buf);
+        context->switching_ctx.sps_buf = NULL;
+        context->switching_ctx.sps_len = 0;
+    }
+    if (context->switching_ctx.pps_buf) {
+        free(context->switching_ctx.pps_buf);
+        context->switching_ctx.pps_buf = NULL;
+        context->switching_ctx.pps_len = 0;
+    }
+    
+    return vt_session;
+}
+
+static int demux_idr_nalu_from_packets(uint8_t **buf_idr_ptr, int *idr_size, const AVPacket *avpkt)
+{
+    uint8_t *pData = avpkt->data;
+    int packet_size = avpkt->size;
+    int offset = 0, nal_type = 0, nalu_size = 0, total_size = 0;
+    
+    while (total_size < packet_size) {
+        nalu_size = ((((const uint8_t*)(pData))[offset] << 24) | (((const uint8_t*)(pData))[offset+1] << 16) | (((const uint8_t*)(pData))[offset+2] <<  8) | ((const uint8_t*)(pData))[offset+3]);
+        offset += 4;
+        nal_type = pData[offset] & 31;
+        if (nal_type == 5) {
+            *idr_size = nalu_size;
+            *buf_idr_ptr = pData + offset;
+            break;
+        }
+        offset += nalu_size;
+    }
+    
+    return 1;
+}
 
 static int decode_video_internal(Ijk_VideoToolBox_Opaque* context, AVCodecContext *avctx, const AVPacket *avpkt, int* got_picture_ptr)
 {
@@ -510,7 +723,31 @@ static int decode_video_internal(Ijk_VideoToolBox_Opaque* context, AVCodecContex
         pts = dts;
     }
 
-    if (context->fmt_desc.convert_bytestream) {
+    if (check_param_set_in_idr_packet(context, avpkt) > 0) {
+        ALOGI("Switching point idr found, count %d.\n", (context->switching_ctx.switchig_ptr_cnt)++);
+        // recreate vtbsession
+//        vtbsession_destroy(context);
+//        check_param_set_in_idr_packet(context, avpkt);
+        context->vt_session = recreate_vtbsession_with_param_sets(context, avpkt);
+        if (!context->vt_session)
+            goto failed;
+  
+        uint8_t *idr_buf = NULL;
+        int idr_size = 0;
+        if (!demux_idr_nalu_from_packets(&idr_buf, &idr_size, avpkt)) {
+            goto failed;
+        }
+        
+        if (avio_open_dyn_buf(&pb) < 0) {
+            goto failed;
+        }
+        
+        avio_wb32(pb, idr_size);
+        avio_write(pb, idr_buf, idr_size);
+        demux_size = avio_close_dyn_buf(pb, &demux_buff);
+        
+        sample_buff = CreateSampleBufferFrom(context->fmt_desc.fmt_desc, demux_buff, demux_size);
+    } else if (context->fmt_desc.convert_bytestream) {
         // ALOGI("the buffer should m_convert_byte\n");
         if(avio_open_dyn_buf(&pb) < 0) {
             goto failed;
@@ -1023,6 +1260,23 @@ static int vtbformat_init(VTBFormatDesc *fmt_desc, AVCodecParameters *codecpar)
 fail:
     vtbformat_destroy(fmt_desc);
     return -1;
+}
+
+static int vtbformat_init_with_param_sets(VTBFormatDesc *fmt_desc, AVCodecParameters *codecpar, uint8_t *sps, size_t sps_size, uint8_t *pps, size_t pps_size)
+{
+    const uint8_t* const parameterSetPointers[2] = { sps, pps };
+    const size_t parameterSetSizes[2] = { sps_size, pps_size };
+    
+    OSStatus status = CMVideoFormatDescriptionCreateFromH264ParameterSets(kCFAllocatorDefault,
+                                                                          2, //param count
+                                                                          parameterSetPointers,
+                                                                          parameterSetSizes,
+                                                                          4, //nal start code size
+                                                                          &(fmt_desc->fmt_desc));
+    if (status == 0)
+        return 0;
+    else
+        return -1;
 }
 
 Ijk_VideoToolBox_Opaque* videotoolbox_sync_create(FFPlayer* ffp, AVCodecContext* avctx)

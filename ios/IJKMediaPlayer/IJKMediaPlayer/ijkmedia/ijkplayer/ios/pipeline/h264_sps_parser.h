@@ -178,7 +178,7 @@ typedef struct
     uint64_t frame_crop_bottom_offset;
 } sps_info_struct;
 
-static void parseh264_sps(uint8_t *sps, uint32_t sps_size,  int *level, int *profile, bool *interlaced, int32_t *max_ref_frames)
+static sps_info_struct parseh264_sps(uint8_t *sps, uint32_t sps_size)
 {
     nal_bitstream bs;
     sps_info_struct sps_info = {0};
@@ -258,10 +258,7 @@ static void parseh264_sps(uint8_t *sps, uint32_t sps_size,  int *level, int *pro
         sps_info.frame_crop_bottom_offset     = nal_bs_read_ue(&bs);
     }
 
-    *level = (int)sps_info.level_idc;
-    *profile = (int)sps_info.profile_idc;
-    *interlaced = (int)!sps_info.frame_mbs_only_flag;
-    *max_ref_frames = (int)sps_info.max_num_ref_frames;
+    return sps_info;
 }
 
 static bool validate_avcC_spc(uint8_t *extradata, uint32_t extrasize, int32_t *max_ref_frames, int *level, int *profile)
@@ -272,7 +269,12 @@ static bool validate_avcC_spc(uint8_t *extradata, uint32_t extrasize, int32_t *m
     uint8_t *spc = extradata + 6;
     uint32_t sps_size = AV_RB16(spc);
     if (sps_size)
-        parseh264_sps(spc+3, sps_size-1, level, profile, &interlaced, max_ref_frames);
+    {
+        sps_info_struct sps = parseh264_sps(spc+3, sps_size-1);
+        *level = (int)sps.level_idc;
+        *profile = (int)sps.profile_idc;
+        *max_ref_frames = (int)sps.max_num_ref_frames;
+    }
     if (interlaced)
         return false;
     return true;
