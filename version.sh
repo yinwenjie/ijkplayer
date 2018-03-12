@@ -2,8 +2,8 @@
 
 set -e
 
-VERSION_CODE=800804
-VERSION_NAME=0.8.8.4-service
+VERSION_CODE=801000
+VERSION_NAME=0.8.10-mp4-rb0
 VERSION_TARGET=$1
 
 do_version_readme() {
