@@ -598,10 +598,6 @@ fail0:
 
 static int decoder_decode_frame(FFPlayer *ffp, Decoder *d, AVFrame *frame, AVSubtitle *sub) {
     int ret = AVERROR(EAGAIN);
-    AVPacket pkt_null = {0};
-    if (ffp->hw_decode_fallback_enable && (d->avctx->codec_type == AVMEDIA_TYPE_VIDEO) && (ffp_packet_queue_nb(d->queue_bak) > 0)) {
-        d->pkt_temp = d->pkt = pkt_null;
-    }
 
     for (;;) {
         AVPacket pkt;
