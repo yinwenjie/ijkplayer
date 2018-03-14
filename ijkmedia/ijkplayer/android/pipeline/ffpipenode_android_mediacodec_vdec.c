@@ -1721,6 +1721,7 @@ fail:
     SDL_AMediaCodec_decreaseReferenceP(&opaque->acodec);
     if (ret == AMEDIACODEC__UNKNOWN_ERROR && !opaque->acodec_decodec_succeed && ffp->hw_decode_fallback_enable) {
         ALOGW("%s MediaCodec:AMEDIACODEC__UNKNOWN_ERROR error will try fallback to ffplay decoder", __func__);
+        av_packet_unref(&d->pkt);
         ffp_video_thread(ffp);
     }
 
