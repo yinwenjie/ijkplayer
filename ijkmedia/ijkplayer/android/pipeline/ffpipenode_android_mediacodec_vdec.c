@@ -765,23 +765,27 @@ static int feed_input_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, 
         if (ffp->hw_decode_fallback_enable && opaque->enable_hw_queue_bak) {
             if (!opaque->acodec_decodec_succeed) {
                 if (ffp_packet_queue_nb(d->queue_bak) < PKG_BAK_QUEUE_MAX) {
-                    ffp_packet_queue_put(d->queue_bak, &pkt);
+                    AVPacket copy = { 0 };
+                    if ((ret = av_packet_ref(&copy, &pkt)) < 0) {
+                        opaque->enable_hw_queue_bak = false;
+                        ffp_packet_queue_flush(d->queue_bak);
+                    } else {
+                        ffp_packet_queue_put(d->queue_bak, &copy);
+                    }
                 } else {
                     opaque->enable_hw_queue_bak = false;
                     ffp_packet_queue_flush(d->queue_bak);
                 }
             } else {
+                opaque->enable_hw_queue_bak = false;
                 if (ffp_packet_queue_nb(d->queue_bak) > 0) {
                     ffp_packet_queue_flush(d->queue_bak);
-                } else {
-                    av_packet_unref(&d->pkt);
                 }
             }
-        } else {
-            av_packet_unref(&d->pkt);
         }
 
         av_packet_split_side_data(&pkt);
+        av_packet_unref(&d->pkt);
         d->pkt_temp = d->pkt = pkt;
         d->packet_pending = 1;
 
