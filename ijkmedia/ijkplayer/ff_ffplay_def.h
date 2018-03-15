@@ -738,7 +738,7 @@ typedef struct FFPlayer {
     char *mediacodec_default_name;
     int ijkmeta_delay_init;
     int render_wait_start;
-    int need_delete_task_time;
+    int64_t need_delete_task_time;
     SDL_mutex *frame_output_mutex;
     SDL_cond  *frame_output_cond;
     int hw_decode_fallback_enable;
