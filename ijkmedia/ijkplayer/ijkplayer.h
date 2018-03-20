@@ -156,6 +156,7 @@ void            ijkmp_global_uninit();
 void            ijkmp_global_set_log_report(int use_report);
 void            ijkmp_global_set_log_level(int log_level);   // log_level = AV_LOG_xxx
 void            ijkmp_global_set_inject_callback(ijk_inject_callback cb);
+void            ijkmp_global_set_log_output_callback(ijk_log_output_callback cb);
 const char     *ijkmp_version();
 void            ijkmp_io_stat_register(void (*cb)(const char *url, int type, int bytes));
 void            ijkmp_io_stat_complete_register(void (*cb)(const char *url,
@@ -166,6 +167,7 @@ void            ijkmp_io_stat_complete_register(void (*cb)(const char *url,
 IjkMediaPlayer *ijkmp_create(int (*msg_loop)(void*));
 void*            ijkmp_set_inject_opaque(IjkMediaPlayer *mp, void *opaque);
 void*            ijkmp_set_ijkio_inject_opaque(IjkMediaPlayer *mp, void *opaque);
+void*            ijkmp_set_log_output_opaque(IjkMediaPlayer *mp, void *opaque);
 
 void            ijkmp_set_option(IjkMediaPlayer *mp, int opt_category, const char *name, const char *value);
 void            ijkmp_set_option_int(IjkMediaPlayer *mp, int opt_category, const char *name, int64_t value);

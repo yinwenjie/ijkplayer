@@ -721,6 +721,7 @@ typedef struct FFPlayer {
 
     void               *inject_opaque;
     void               *ijkio_inject_opaque;
+    void               *log_output_opaque;
     FFStatistic         stat;
     FFDemuxCacheControl dcc;
 

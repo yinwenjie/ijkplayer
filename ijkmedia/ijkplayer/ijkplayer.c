@@ -91,6 +91,11 @@ void ijkmp_global_set_inject_callback(ijk_inject_callback cb)
     ffp_global_set_inject_callback(cb);
 }
 
+void ijkmp_global_set_log_output_callback(ijk_log_output_callback cb)
+{
+    ffp_global_set_inject_callback(cb);
+}
+
 const char *ijkmp_version()
 {
     return IJKPLAYER_VERSION;
@@ -142,6 +147,16 @@ void *ijkmp_set_inject_opaque(IjkMediaPlayer *mp, void *opaque)
 
     MPTRACE("%s(%p)\n", __func__, opaque);
     void *prev_weak_thiz = ffp_set_inject_opaque(mp->ffplayer, opaque);
+    MPTRACE("%s()=void\n", __func__);
+    return prev_weak_thiz;
+}
+
+void *ijkmp_set_log_output_opaque(IjkMediaPlayer *mp, void *opaque)
+{
+    assert(mp);
+
+    MPTRACE("%s(%p)\n", __func__, opaque);
+    void *prev_weak_thiz = ffp_set_log_output_opaque(mp->ffplayer, opaque);
     MPTRACE("%s()=void\n", __func__);
     return prev_weak_thiz;
 }

@@ -3961,13 +3961,41 @@ inline static int log_level_ijk_to_av(int ijk_level)
     return av_level;
 }
 
+static ijk_log_output_callback s_log_output_callback;
+static void *s_log_output_opaque;
+void log_output_callback(int level, const char* fmt, va_list vl)
+{
+    if (s_log_output_callback && s_log_output_opaque)
+        s_log_output_callback(s_log_output_opaque, level, fmt, vl);
+}
+
+void ffp_global_set_log_output_callback(ijk_log_output_callback cb)
+{
+    s_log_output_callback = cb;
+}
+
+void *ffp_set_log_output_opaque(FFPlayer *ffp, void *opaque)
+{
+    if (!ffp)
+        return NULL;
+    void *prev_weak_thiz = ffp->log_output_opaque;
+    ffp->log_output_opaque = opaque;
+    s_log_output_opaque = opaque;
+
+    return prev_weak_thiz;
+}
+
 static void ffp_log_callback_brief(void *ptr, int level, const char *fmt, va_list vl)
 {
     if (level > av_log_get_level())
         return;
 
     int ffplv __unused = log_level_av_to_ijk(level);
-    VLOG(ffplv, IJK_LOG_TAG, fmt, vl);
+    if (s_log_output_callback && s_log_output_opaque) {
+        log_output_callback(ffplv, fmt, vl);
+    } else {
+        VLOG(ffplv, IJK_LOG_TAG, fmt, vl);
+    }
 }
 
 static void ffp_log_callback_report(void *ptr, int level, const char *fmt, va_list vl)
