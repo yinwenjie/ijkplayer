@@ -34,6 +34,7 @@ void      ffp_global_uninit();
 void      ffp_global_set_log_report(int use_report);
 void      ffp_global_set_log_level(int log_level);
 void      ffp_global_set_inject_callback(ijk_inject_callback cb);
+void      ffp_global_set_log_output_callback(ijk_log_output_callback cb);
 void      ffp_io_stat_register(void (*cb)(const char *url, int type, int bytes));
 void      ffp_io_stat_complete_register(void (*cb)(const char *url,
                                                    int64_t read_bytes, int64_t total_size,
@@ -48,6 +49,7 @@ void      ffp_reset(FFPlayer *ffp);
 
 int       ffp_add_frame_output_task(FFPlayer *ffp, const char *path, int64_t start_time, int frame_interval, int count, int definition, int type);
 void     *ffp_set_inject_opaque(FFPlayer *ffp, void *opaque);
+void     *ffp_set_log_output_opaque(FFPlayer *ffp, void *opaque);
 void     *ffp_set_ijkio_inject_opaque(FFPlayer *ffp, void *opaque);
 void      ffp_set_option(FFPlayer *ffp, int opt_category, const char *name, const char *value);
 void      ffp_set_option_int(FFPlayer *ffp, int opt_category, const char *name, int64_t value);
