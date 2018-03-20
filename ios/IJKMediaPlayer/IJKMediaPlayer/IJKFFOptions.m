@@ -32,6 +32,7 @@
     NSMutableDictionary *_codecOptions;
     NSMutableDictionary *_swsOptions;
     NSMutableDictionary *_swrOptions;
+    BOOL                _logOutput;
 }
 
 + (IJKFFOptions *)optionsByDefault
@@ -58,6 +59,7 @@
 {
     self = [super init];
     if (self) {
+        _logOutput          = false;
         _playerOptions      = [[NSMutableDictionary alloc] init];
         _formatOptions      = [[NSMutableDictionary alloc] init];
         _codecOptions       = [[NSMutableDictionary alloc] init];
@@ -164,6 +166,16 @@
 -(void)setPlayerOptionIntValue:(int64_t)value forKey:(NSString *)key
 {
     [self setOptionIntValue:value forKey:key ofCategory:kIJKFFOptionCategoryPlayer];
+}
+
+-(void)enableLogOutput:(BOOL)value
+{
+    _logOutput = value;
+}
+
+-(BOOL)isLogOutput
+{
+    return _logOutput;
 }
 
 @end

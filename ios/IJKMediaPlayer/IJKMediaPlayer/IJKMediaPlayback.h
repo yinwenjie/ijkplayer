@@ -225,3 +225,13 @@ typedef NS_ENUM(NSInteger, IJKMediaEvent) {
 - (int)invoke:(IJKMediaEvent)event attributes:(NSDictionary *)attributes;
 
 @end
+
+@protocol IJKLogOutputDelegate <NSObject>
+
+- (void)LogErrorOutput:(NSString*) fmt ap:(va_list) ap;
+- (void)LogWarnOutput:(NSString*) fmt ap:(va_list) ap;
+- (void)LogInfoOutput:(NSString*) fmt ap:(va_list) ap;
+- (void)LogDebugOutput:(NSString*) fmt ap:(va_list) ap;
+- (void)LogVerboseOutput:(NSString*) fmt ap:(va_list) ap;
+
+@end
