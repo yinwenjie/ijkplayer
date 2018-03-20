@@ -187,6 +187,9 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
     if (self) {
         ijkmp_global_init();
         ijkmp_global_set_inject_callback(ijkff_inject_callback);
+        if ([options isLogOutput]) {
+            ijkmp_global_set_log_output_callback(ijkff_log_output_callback);
+        }
 
         [IJKFFMoviePlayerController checkIfFFmpegVersionMatch:NO];
 
@@ -215,6 +218,7 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
         ijkmp_set_weak_thiz(_mediaPlayer, (__bridge_retained void *) self);
         ijkmp_set_inject_opaque(_mediaPlayer, (__bridge_retained void *) weakHolder);
         ijkmp_set_ijkio_inject_opaque(_mediaPlayer, (__bridge_retained void *)weakHolder);
+        ijkmp_set_log_output_opaque(_mediaPlayer, (__bridge_retained void *) weakHolder);
         ijkmp_set_option_int(_mediaPlayer, IJKMP_OPT_CATEGORY_PLAYER, "start-on-prepared", _shouldAutoplay ? 1 : 0);
 
         // init video sink
@@ -247,7 +251,11 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
 #ifdef DEBUG
         [IJKFFMoviePlayerController setLogLevel:k_IJK_LOG_DEBUG];
 #else
-        [IJKFFMoviePlayerController setLogLevel:k_IJK_LOG_SILENT];
+        if ([options isLogOutput]) {
+            [IJKFFMoviePlayerController setLogLevel:k_IJK_LOG_DEBUG];
+        } else {
+            [IJKFFMoviePlayerController setLogLevel:k_IJK_LOG_SILENT];
+        }
 #endif
         // init audio sink
         [[IJKAudioKit sharedInstance] setupAudioSession];
@@ -290,6 +298,9 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
     if (self) {
         ijkmp_global_init();
         ijkmp_global_set_inject_callback(ijkff_inject_callback);
+        if ([options isLogOutput]) {
+            ijkmp_global_set_log_output_callback(ijkff_log_output_callback);
+        }
 
         [IJKFFMoviePlayerController checkIfFFmpegVersionMatch:NO];
 
@@ -318,6 +329,7 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
         ijkmp_set_weak_thiz(_mediaPlayer, (__bridge_retained void *) self);
         ijkmp_set_inject_opaque(_mediaPlayer, (__bridge_retained void *) weakHolder);
         ijkmp_set_ijkio_inject_opaque(_mediaPlayer, (__bridge_retained void *)weakHolder);
+        ijkmp_set_log_output_opaque(_mediaPlayer, (__bridge_retained void *) weakHolder);
         ijkmp_set_option_int(_mediaPlayer, IJKMP_OPT_CATEGORY_PLAYER, "start-on-prepared", _shouldAutoplay ? 1 : 0);
 
         self.shouldShowHudView = options.showHudView;
@@ -596,10 +608,12 @@ inline static int getPlayerOption(IJKFFOptionCategory category)
     _httpOpenDelegate       = nil;
     _liveOpenDelegate       = nil;
     _nativeInvokeDelegate   = nil;
+    _logOutputDelegate      = nil;
 
     __unused id weakPlayer = (__bridge_transfer IJKFFMoviePlayerController*)ijkmp_set_weak_thiz(_mediaPlayer, NULL);
     __unused id weakHolder = (__bridge_transfer IJKWeakHolder*)ijkmp_set_inject_opaque(_mediaPlayer, NULL);
     __unused id weakijkHolder = (__bridge_transfer IJKWeakHolder*)ijkmp_set_ijkio_inject_opaque(_mediaPlayer, NULL);
+    __unused id weakLogHolder = (__bridge_transfer IJKWeakHolder*)ijkmp_set_log_output_opaque(_mediaPlayer, NULL);
     ijkmp_dec_ref_p(&_mediaPlayer);
 
     [self didShutdown];
@@ -1602,6 +1616,47 @@ static int ijkff_inject_callback(void *opaque, int message, void *data, size_t d
             return 0;
         }
     }
+}
+
+// NOTE: could be called from multiple thread
+static void ijkff_log_output_callback(void *opaque, int level, const char* fmt, ...)
+{
+    IJKWeakHolder *weakHolder = (__bridge IJKWeakHolder*)opaque;
+    IJKFFMoviePlayerController *mpc = weakHolder.object;
+    if (!mpc)
+        return;
+
+    id<IJKLogOutputDelegate> delegate = mpc.logOutputDelegate;
+    if (!delegate)
+        return;
+
+    NSString *nsFmt = [NSString stringWithFormat:@"%s", fmt];
+    va_list ijkap;
+    va_start(ijkap, fmt);
+    switch (level) {
+        case IJK_LOG_ERROR:
+        case IJK_LOG_FATAL:
+        case IJK_LOG_SILENT:
+            [delegate LogErrorOutput:nsFmt ap:ijkap];
+            break;
+        case IJK_LOG_WARN:
+            [delegate LogWarnOutput:nsFmt ap:ijkap];
+            break;
+        case IJK_LOG_INFO:
+            [delegate LogInfoOutput:nsFmt ap:ijkap];
+            break;
+        case IJK_LOG_DEBUG:
+            [delegate LogDebugOutput:nsFmt ap:ijkap];
+            break;
+        case IJK_LOG_UNKNOWN:
+        case IJK_LOG_DEFAULT:
+        case IJK_LOG_VERBOSE:
+            [delegate LogVerboseOutput:nsFmt ap:ijkap];
+            break;
+        default:
+            break;
+    }
+    va_end(ijkap);
 }
 
 #pragma mark Airplay
