@@ -74,8 +74,66 @@ fail:
     return ret_string;
 }
 
+
+
+static jintArray
+FFmpegApi_av_get_resolution(JNIEnv *env, jclass clazz, jstring in)
+{
+    H264ParamSets ps;
+    const PPS *pps = NULL;
+    const SPS *sps = NULL;
+    memset(&ps, 0, sizeof(ps));
+    int is_avc=0;
+    int nal_length_size=0;
+    int i;
+    int res[2] = {0};
+    jintArray jres = (*env)->NewIntArray(env, 2);
+
+    char * extradata_enc = (*env)->GetStringUTFChars(env, in, NULL);
+
+    if (!extradata_enc)
+        goto fail;
+
+    //Init Video Stream
+    int extradata_size = AV_BASE64_DECODE_SIZE(strlen(extradata_enc)) + AV_INPUT_BUFFER_PADDING_SIZE;
+    char * extradata = av_mallocz(extradata_size);
+    int r_extradata_size = av_base64_decode(extradata, extradata_enc, extradata_size);
+
+    if ((ff_h264_decode_extradata(extradata, r_extradata_size, &ps,
+                     &is_avc, &nal_length_size,
+                     0, NULL)) < 0)
+        goto fail;
+
+
+    for (i = 0; i < MAX_PPS_COUNT; i++) {
+        if (ps.pps_list[i]) {
+            pps = (const PPS*)ps.pps_list[i]->data;
+            break;
+        }
+    }
+
+    if (pps)
+        if (ps.sps_list[pps->sps_id])
+            sps = (const SPS*)ps.sps_list[pps->sps_id]->data;
+
+    if (pps && sps) {
+        res[0] = sps->mb_width  * 16 - (sps->crop_right + sps->crop_left);
+        res[1] = sps->mb_height * 16 - (sps->crop_top   + sps->crop_bottom);
+    } else
+        goto fail;
+
+    av_log(NULL, AV_LOG_INFO, "width = %d, height = %d\n", res[0], res[1]);
+fail:
+    if (extradata)
+        av_freep(&extradata);
+    (*env)->SetIntArrayRegion(env, jres, 0, 2, res);
+    return jres;
+
+}
+
 static JNINativeMethod g_methods[] = {
     {"av_base64_encode", "([B)Ljava/lang/String;", (void *) FFmpegApi_av_base64_encode},
+    {"av_get_resolution", "(Ljava/lang/String;)[I", (void*) FFmpegApi_av_get_resolution}
 };
 
 int FFmpegApi_global_init(JNIEnv *env)
