@@ -40,6 +40,7 @@
 #include "libswresample/swresample.h"
 
 #include "ijksdl/ijksdl.h"
+#include "ff_extradata.h"
 
 typedef int (*ijk_inject_callback)(void *opaque, int type, void *data, size_t data_size);
 typedef void (*ijk_log_output_callback)(void *opaque, int level, const char* fmt, ...);
