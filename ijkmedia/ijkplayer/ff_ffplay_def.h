@@ -435,6 +435,8 @@ typedef struct VideoState {
     SDL_cond  *video_accurate_seek_cond;
     SDL_cond  *audio_accurate_seek_cond;
     volatile int initialized_decoder;
+    volatile int initialized_demuxer;
+    volatile int extradata_diff;
     int seek_buffering;
 } VideoState;
 
@@ -589,6 +591,16 @@ typedef struct FFPlayer {
     AVInputFormat *file_iformat;
 #endif
     char *input_filename;
+    char *video_extradata;
+    char *audio_extradata;
+    char * video_extradata_guess ;
+    char * audio_extradata_guess ;
+    int video_extradata_size_guess ;
+    int audio_extradata_size_guess ;
+    int64_t extradata_error;
+
+    int mediacodec_rotate_degrees;
+
 #ifdef FFP_MERGE
     const char *window_title;
     int fs_screen_width;
@@ -848,6 +860,18 @@ inline static void ffp_reset_internal(FFPlayer *ffp)
 
     ffp->iformat_name                   = NULL; // option
 
+
+    // For init decoder without find_stream_info
+    ffp->video_extradata                = NULL;
+    ffp->audio_extradata                = NULL;
+    ffp->video_extradata_guess          = NULL;
+    ffp->audio_extradata_guess          = NULL;
+    ffp->video_extradata_size_guess     = 0;
+    ffp->audio_extradata_size_guess     = 0;
+    ffp->mediacodec_rotate_degrees      = 0;
+    ffp->extradata_error                = 0;
+
+
     ffp->no_time_adjust                 = 0; // option
     ffp->async_init_decoder             = 0; // option
     ffp->video_mime_type                = NULL; // option
@@ -881,6 +905,8 @@ inline static void ffp_reset_internal(FFPlayer *ffp)
     ffp_reset_statistic(&ffp->stat);
     ffp_reset_demux_cache_control(&ffp->dcc);
 }
+
+
 
 inline static void ffp_notify_msg1(FFPlayer *ffp, int what) {
     msg_queue_put_simple3(&ffp->msg_queue, what, 0, 0);

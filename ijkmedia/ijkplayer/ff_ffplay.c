@@ -63,6 +63,7 @@
 # include "libavfilter/buffersrc.h"
 #endif
 
+#include "libavutil/base64.h"
 #include "ijksdl/ijksdl_log.h"
 #include "ijkavformat/ijkavformat.h"
 #include "ff_cmdutils.h"
@@ -2027,6 +2028,12 @@ static int audio_thread(void *arg)
     int64_t deviation2 = 0;
     int64_t deviation3 = 0;
 
+    while(!ffp->is->initialized_demuxer)
+        SDL_Delay(5);
+
+    if (ffp->is->extradata_diff)
+        return 0;
+
     if (!frame)
         return AVERROR(ENOMEM);
 
@@ -2442,6 +2449,12 @@ static int video_thread(void *arg)
     FFPlayer *ffp = (FFPlayer *)arg;
     int       ret = 0;
 
+    while(!ffp->is->initialized_demuxer)
+        SDL_Delay(5);
+
+    if (ffp->is->extradata_diff)
+        return 0;
+
     if (ffp->node_vdec) {
         ret = ffpipenode_run_sync(ffp->node_vdec);
     }
@@ -2759,7 +2772,10 @@ static void sdl_audio_callback(void *opaque, Uint8 *stream, int len)
 
     while (len > 0) {
         if (is->audio_buf_index >= is->audio_buf_size) {
-           audio_size = audio_decode_frame(ffp);
+           if (!is->initialized_demuxer)
+               audio_size = -1;
+           else
+               audio_size = audio_decode_frame(ffp);
            if (audio_size < 0) {
                 /* if error, just output silence */
                is->audio_buf = NULL;
@@ -3036,7 +3052,8 @@ static int stream_component_open(FFPlayer *ffp, int stream_index)
         is->audio_st = ic->streams[stream_index];
 
         decoder_init(&is->auddec, avctx, &is->audioq, is->continue_read_thread);
-        if ((is->ic->iformat->flags & (AVFMT_NOBINSEARCH | AVFMT_NOGENSEARCH | AVFMT_NO_BYTE_SEEK)) && !is->ic->iformat->read_seek) {
+
+        if (is->ic->iformat && (is->ic->iformat->flags & (AVFMT_NOBINSEARCH | AVFMT_NOGENSEARCH | AVFMT_NO_BYTE_SEEK)) && !is->ic->iformat->read_seek) {
             is->auddec.start_pts = is->audio_st->start_time;
             is->auddec.start_pts_tb = is->audio_st->time_base;
         }
@@ -3048,29 +3065,14 @@ static int stream_component_open(FFPlayer *ffp, int stream_index)
         is->video_stream = stream_index;
         is->video_st = ic->streams[stream_index];
 
-        if (ffp->async_init_decoder) {
-            while (!is->initialized_decoder) {
-                SDL_Delay(5);
-            }
-            if (ffp->node_vdec) {
-                is->viddec.avctx = avctx;
-                ret = ffpipeline_config_video_decoder(ffp->pipeline, ffp);
-            }
-            if (ret || !ffp->node_vdec) {
-                decoder_init(&is->viddec, avctx, &is->videoq, is->continue_read_thread);
-                is->viddec.queue_bak = &is->videoq_bak;
-                ffp->node_vdec = ffpipeline_open_video_decoder(ffp->pipeline, ffp);
-                if (!ffp->node_vdec)
-                    goto fail;
-            }
-        } else {
-            decoder_init(&is->viddec, avctx, &is->videoq, is->continue_read_thread);
-            is->viddec.queue_bak = &is->videoq_bak;
-            ffp->node_vdec = ffpipeline_open_video_decoder(ffp->pipeline, ffp);
-            if (!ffp->node_vdec)
-                goto fail;
-        }
+        decoder_init(&is->viddec, avctx, &is->videoq, is->continue_read_thread);
+        is->viddec.queue_bak = &is->videoq_bak;
+        ffp->node_vdec = ffpipeline_open_video_decoder(ffp->pipeline, ffp);
+        if (!ffp->node_vdec)
+            goto fail;
+
         packet_queue_start(&is->videoq_bak);
+
         if ((ret = decoder_start(&is->viddec, video_thread, ffp, "ff_video_dec")) < 0)
             goto out;
 
@@ -3130,6 +3132,122 @@ out:
     return ret;
 }
 
+static int decoder_open(FFPlayer *ffp, AVCodecContext * avctx)
+{
+    VideoState *is = ffp->is;
+    AVFormatContext *ic = is->ic;
+    AVCodec *codec = NULL;
+    const char *forced_codec_name = NULL;
+    AVDictionaryEntry *t = NULL;
+    int sample_rate, nb_channels;
+    int64_t channel_layout;
+    int ret = 0;
+    int stream_lowres = ffp->lowres;
+
+    if (!avctx)
+        return AVERROR(ENOMEM);
+
+
+    codec = avctx->codec;
+
+    if(stream_lowres > av_codec_get_max_lowres(codec)){
+        av_log(avctx, AV_LOG_WARNING, "The maximum value for lowres supported by the decoder is %d\n",
+                av_codec_get_max_lowres(codec));
+        stream_lowres = av_codec_get_max_lowres(codec);
+  }
+    av_codec_set_lowres(avctx, stream_lowres);
+
+#if FF_API_EMU_EDGE
+    if(stream_lowres) avctx->flags |= CODEC_FLAG_EMU_EDGE;
+#endif
+    if (ffp->fast)
+        avctx->flags2 |= AV_CODEC_FLAG2_FAST;
+#if FF_API_EMU_EDGE
+    if(codec->capabilities & AV_CODEC_CAP_DR1)
+        avctx->flags |= CODEC_FLAG_EMU_EDGE;
+#endif
+    if (!av_dict_get(ffp->codec_opts, "threads", NULL, 0))
+        av_dict_set(&ffp->codec_opts, "threads", "auto", 0);
+    if (stream_lowres)
+        av_dict_set_int(&ffp->codec_opts, "lowres", stream_lowres, 0);
+    if (avctx->codec_type == AVMEDIA_TYPE_VIDEO || avctx->codec_type == AVMEDIA_TYPE_AUDIO)
+        av_dict_set(&ffp->codec_opts, "refcounted_frames", "1", 0);
+    if ((ret = avcodec_open2(avctx, codec, &ffp->codec_opts)) < 0) {
+        goto fail;
+    }
+    if ((t = av_dict_get(ffp->codec_opts, "", NULL, AV_DICT_IGNORE_SUFFIX))) {
+        av_log(NULL, AV_LOG_ERROR, "Option %s not found.\n", t->key);
+    }
+
+    is->eof = 0;
+    switch (avctx->codec_type) {
+    case AVMEDIA_TYPE_AUDIO:
+        sample_rate    = avctx->sample_rate;
+        nb_channels    = avctx->channels;
+        channel_layout = avctx->channel_layout;
+
+        /* prepare audio output */
+        if ((ret = audio_open(ffp, channel_layout, nb_channels, sample_rate, &is->audio_tgt)) < 0)
+            goto fail;
+        ffp_set_audio_codec_info(ffp, AVCODEC_MODULE_NAME, avcodec_get_name(avctx->codec_id));
+        is->audio_hw_buf_size = ret;
+        is->audio_src = is->audio_tgt;
+        is->audio_buf_size  = 0;
+        is->audio_buf_index = 0;
+
+        /* init averaging filter */
+        is->audio_diff_avg_coef  = exp(log(0.01) / AUDIO_DIFF_AVG_NB);
+        is->audio_diff_avg_count = 0;
+        /* since we do not have a precise anough audio FIFO fullness,
+           we correct audio sync only if larger than this threshold */
+        is->audio_diff_threshold = 2.0 * is->audio_hw_buf_size / is->audio_tgt.bytes_per_sec;
+
+
+        decoder_init(&is->auddec, avctx, &is->audioq, is->continue_read_thread);
+
+        if (is->ic->iformat && (is->ic->iformat->flags & (AVFMT_NOBINSEARCH | AVFMT_NOGENSEARCH | AVFMT_NO_BYTE_SEEK)) && !is->ic->iformat->read_seek) {
+            is->auddec.start_pts = is->audio_st->start_time;
+            is->auddec.start_pts_tb = is->audio_st->time_base;
+        }
+        break;
+    case AVMEDIA_TYPE_VIDEO:
+        if (!ffp->video_disable && ffp->video_mime_type && strlen(ffp->video_mime_type) > 0
+                    && ffp->mediacodec_default_name && strlen(ffp->mediacodec_default_name) > 0) {
+            if (ffp->mediacodec_all_videos || ffp->mediacodec_avc || ffp->mediacodec_hevc || ffp->mediacodec_mpeg2) {
+                decoder_init(&is->viddec, NULL, &is->videoq, is->continue_read_thread);
+                is->viddec.queue_bak = &is->videoq_bak;
+                ffp->node_vdec = ffpipeline_init_video_decoder(ffp->pipeline, ffp);
+            }
+        }
+
+        if (ffp->node_vdec) {
+            is->viddec.avctx = avctx;
+            ret = ffpipeline_config_video_decoder(ffp->pipeline, ffp);
+        } else {
+            decoder_init(&is->viddec, avctx, &is->videoq, is->continue_read_thread);
+            is->viddec.queue_bak = &is->videoq_bak;
+            ffp->node_vdec = ffpipeline_open_video_decoder(ffp->pipeline, ffp);
+            if (!ffp->node_vdec)
+                goto fail;
+        }
+        packet_queue_start(&is->videoq_bak);
+
+        is->queue_attachments_req = 1;
+
+        break;
+    default:
+        break;
+    }
+    goto out;
+
+fail:
+    avcodec_free_context(&avctx);
+out:
+
+    return ret;
+}
+
+
 static int decode_interrupt_cb(void *ctx)
 {
     VideoState *is = ctx;
@@ -3162,6 +3280,164 @@ static int is_realtime(AVFormatContext *s)
     return 0;
 }
 
+static AVCodecContext * create_video_decoder_by_extradata (FFPlayer *ffp, const uint8_t *extradata_enc) {
+    int ret = 0;
+    const AVCodec * codec;
+    H264ParamSets ps;
+    const PPS *pps = NULL;
+    const SPS *sps = NULL;
+    memset(&ps, 0, sizeof(ps));
+    int is_avc=0;
+    int nal_length_size=0;
+    int i;
+    AVCodecContext * avctx = NULL;
+
+    if (!extradata_enc)
+        return NULL;
+
+    //Init Video Stream
+    if ((codec = avcodec_find_decoder(AV_CODEC_ID_H264)) == NULL)
+        return NULL;
+
+    if ((avctx = avcodec_alloc_context3(codec)) == NULL)
+        return NULL;
+
+
+    int extradata_size = AV_BASE64_DECODE_SIZE(strlen(extradata_enc)) + AV_INPUT_BUFFER_PADDING_SIZE;
+    avctx->extradata = av_mallocz(extradata_size);
+    avctx->extradata_size = av_base64_decode(avctx->extradata, extradata_enc, extradata_size);
+
+    ffp->video_extradata_guess = av_malloc(avctx->extradata_size);
+    memcpy(ffp->video_extradata_guess, avctx->extradata, avctx->extradata_size);
+    ffp->video_extradata_size_guess = avctx->extradata_size;
+
+    if ((ret = ff_h264_decode_extradata(avctx->extradata, avctx->extradata_size, &ps,
+                     &is_avc, &nal_length_size,
+                     0, avctx)) < 0)
+        return NULL;
+
+    for (i = 0; i < MAX_PPS_COUNT; i++) {
+        if (ps.pps_list[i]) {
+            pps = (const PPS*)ps.pps_list[i]->data;
+            break;
+        }
+    }
+
+    if (pps)
+        if (ps.sps_list[pps->sps_id])
+            sps = (const SPS*)ps.sps_list[pps->sps_id]->data;
+
+    if (pps && sps) {
+        avctx->width  = sps->mb_width  * 16 - (sps->crop_right + sps->crop_left);
+        avctx->height = sps->mb_height * 16 - (sps->crop_top   + sps->crop_bottom);
+        avctx->profile = sps->profile_idc;
+        avctx->level   = sps->level_idc;
+    } else
+        return NULL;
+
+    av_log(NULL, AV_LOG_DEBUG, "width = %d, height = %d\n",
+           avctx->width,
+           avctx->height);
+
+    avctx->time_base = (AVRational){1, sps->time_scale};
+    // framerate = time_scale / (num_units_in_tick * ( 1 + nuit_field_based_flag ))
+    av_reduce(&avctx->framerate.num, &avctx->framerate.den, sps->time_scale,
+              sps->num_units_in_tick * (H264_NUIT_FIELD_BASED_FLAG + 1), INT_MAX);
+
+    av_log(NULL, AV_LOG_DEBUG, "time_base= {%d,%d}, framerate = {%d,%d}\n",
+           avctx->time_base.num,
+           avctx->time_base.den,
+           avctx->framerate.num,
+           avctx->framerate.den);
+    avctx->pix_fmt = AV_PIX_FMT_YUV420P;
+    avctx->codec_type = AVMEDIA_TYPE_VIDEO;
+
+    return avctx;
+}
+
+static AVCodecContext * create_audio_decoder_by_extradata (FFPlayer *ffp, const uint8_t *extradata_enc) {
+    int ret = 0;
+    const AVCodec * pCodec = NULL;
+    AVCodecContext * avctx = NULL;
+    MPEG4AudioConfig m4ac;
+    memset(&m4ac, 0, sizeof(m4ac));
+
+    if (!extradata_enc)
+        return NULL;
+
+    //Init Audio Stream
+    if ((pCodec = avcodec_find_decoder(AV_CODEC_ID_AAC)) == NULL)
+        return NULL;
+
+    if ((avctx = avcodec_alloc_context3(pCodec)) == NULL)
+        return NULL;
+
+    int extradata_size = AV_BASE64_DECODE_SIZE(strlen(extradata_enc)) + AV_INPUT_BUFFER_PADDING_SIZE;
+    avctx->extradata = av_mallocz(extradata_size);
+    avctx->extradata_size = av_base64_decode(avctx->extradata, extradata_enc, extradata_size);
+
+
+    ffp->audio_extradata_guess = av_malloc(avctx->extradata_size);
+    memcpy(ffp->audio_extradata_guess, avctx->extradata, avctx->extradata_size);
+    ffp->audio_extradata_size_guess = avctx->extradata_size;
+
+    if ((ret = avpriv_mpeg4audio_get_config(&m4ac,
+                                            avctx->extradata,
+                                            avctx->extradata_size,
+                                            1)) < 0)
+       return NULL;
+
+    av_log(NULL, AV_LOG_DEBUG, "sample_rate = %d, channels = %d\n",m4ac.sample_rate, m4ac.channels);
+
+    avctx->sample_rate = m4ac.sample_rate;
+    avctx->channels = m4ac.channels;
+    avctx->bits_per_coded_sample = 16;
+    avctx->time_base = (AVRational){1, m4ac.sample_rate};
+    avctx->sample_fmt = AV_SAMPLE_FMT_FLTP;
+    avctx->codec_type = AVMEDIA_TYPE_AUDIO;
+    avctx->channel_layout = av_get_default_channel_layout(avctx->channels);
+
+    avctx->frame_size = m4ac.frame_length_short ? 960 : 1024;
+    avctx->frame_size <<= (m4ac.sbr == 1) ? m4ac.ext_sample_rate > m4ac.sample_rate : 0;
+
+    return avctx;
+}
+
+
+static int check_streams(FFPlayer *ffp, int streams) {
+    int i;
+    VideoState *is = ffp->is;
+
+    for (i = 0; i < is->ic->nb_streams; i++) {
+        uint8_t * old_extradata =  i == is->video_stream ? ffp->video_extradata_guess :
+                                   i == is->audio_stream ? ffp->audio_extradata_guess : NULL;
+        size_t old_extradata_size = i == is->video_stream ? ffp->video_extradata_size_guess :
+                                 i == is->audio_stream ? ffp->audio_extradata_size_guess : 0;
+        uint8_t * new_extradata = is->ic->streams[i]->codecpar->extradata;
+        size_t new_extradata_size = is->ic->streams[i]->codecpar->extradata_size;
+        if (new_extradata) {
+            av_log(NULL, AV_LOG_INFO, "Stream:%d new extradata\n", i);
+            if (old_extradata_size !=  new_extradata_size ||
+                memcmp(old_extradata, new_extradata, new_extradata_size)) {
+                    size_t new_extradata_enc_size = AV_BASE64_SIZE(new_extradata_size);
+                    char *   new_extradata_enc = av_mallocz(new_extradata_enc_size + 1);
+                    if (!new_extradata_enc)
+                        return -1;
+                    new_extradata_enc[new_extradata_enc_size] = 0;
+
+                    if (!av_base64_encode(new_extradata_enc, new_extradata_enc_size, (const uint8_t *)new_extradata, new_extradata_size))
+                        return -1;
+                av_log(NULL, AV_LOG_INFO, "Stream:%d extradata differ , old = %s, new = %s\n", i,
+                       (i == is->video_stream ? ffp->video_extradata : ffp->audio_extradata), new_extradata_enc);
+
+                return -1;
+            }
+        }
+    }
+    return 0;
+}
+
+
 /* this thread gets the stream from the disk or the network */
 static int read_thread(void *arg)
 {
@@ -3182,7 +3458,7 @@ static int read_thread(void *arg)
     int64_t prev_io_tick_counter = 0;
     int64_t io_tick_counter = 0;
     int init_ijkmeta = 0;
-
+retry_info:
     if (!wait_mutex) {
         av_log(NULL, AV_LOG_FATAL, "SDL_CreateMutex(): %s\n", SDL_GetError());
         ret = AVERROR(ENOMEM);
@@ -3190,12 +3466,25 @@ static int read_thread(void *arg)
     }
 
     memset(st_index, -1, sizeof(st_index));
-    is->last_video_stream = is->video_stream = -1;
-    is->last_audio_stream = is->audio_stream = -1;
-    is->last_subtitle_stream = is->subtitle_stream = -1;
+
+    if (!ffp->async_init_decoder) {
+        is->last_video_stream = is->video_stream = -1;
+        is->last_audio_stream = is->audio_stream = -1;
+        is->last_subtitle_stream = is->subtitle_stream = -1;
+    } else {
+        is->last_video_stream    = is->video_stream;
+        is->last_audio_stream    = is->audio_stream;
+        is->last_subtitle_stream = is->subtitle_stream = -1;
+    }
+
     is->eof = 0;
 
-    ic = avformat_alloc_context();
+    if (!ffp->async_init_decoder) {
+        ic = avformat_alloc_context();
+    } else {
+        ic = is->ic;
+    }
+
     if (!ic) {
         av_log(NULL, AV_LOG_FATAL, "Could not allocate context.\n");
         ret = AVERROR(ENOMEM);
@@ -3219,8 +3508,10 @@ static int read_thread(void *arg)
         av_dict_set_int(&ffp->format_opts, "skip-calc-frame-rate", ffp->skip_calc_frame_rate, 0);
     }
 
-    if (ffp->iformat_name)
-        is->iformat = av_find_input_format(ffp->iformat_name);
+    if (ffp->async_init_decoder) {
+        av_dict_set_int(&ffp->format_opts, "nb-streams",   2, 0);
+        av_dict_set_int(&ffp->format_opts, "auto_convert", 0, 0);
+    }
     err = avformat_open_input(&ic, is->filename, is->iformat, &ffp->format_opts);
     if (err < 0) {
         print_error(is->filename, err);
@@ -3244,6 +3535,12 @@ static int read_thread(void *arg)
     if (ffp->genpts)
         ic->flags |= AVFMT_FLAG_GENPTS;
 
+#ifdef FF_API_LAVF_KEEPSIDE_FLAG
+    if (ffp->async_init_decoder) {
+        ic->flags |= AVFMT_FLAG_KEEP_SIDE_DATA;
+    }
+#endif
+
     av_format_inject_global_side_data(ic);
     //
     //AVDictionary **opts;
@@ -3252,7 +3549,7 @@ static int read_thread(void *arg)
     //orig_nb_streams = ic->nb_streams;
 
 
-    if (ffp->find_stream_info) {
+    if (!ffp->async_init_decoder) {
         AVDictionary **opts = setup_find_stream_info_opts(ic, ffp->codec_opts);
         int orig_nb_streams = ic->nb_streams;
 
@@ -3282,7 +3579,42 @@ static int read_thread(void *arg)
             ret = -1;
             goto fail;
         }
+    } else {
+        av_dict_set_int(&ic->metadata, "nb-streams", 2, 0);
+        // Disable bitstream filter for time saving
+        if ((avformat_find_stream_info(ffp->is->ic, NULL) < 0) ||
+            (check_streams(ffp, 2) < 0)) {
+            while (!is->initialized_decoder)
+                SDL_Delay(5);
+            ffp->is->extradata_diff = 1;
+            is->initialized_demuxer = 1;
+            stream_component_close(ffp, is->video_stream);
+            stream_component_close(ffp, is->audio_stream);
+            av_dict_set_int(&ffp->format_opts, "auto_convert", 1, 0);
+            av_dict_set_int(&ffp->format_opts, "nb-streams", 0, 0);
+            avformat_close_input(&ic);
+            av_log(NULL, AV_LOG_INFO, "rebuild context\n");
+            if (ffp->node_vdec)
+                ffpipenode_free_p(&ffp->node_vdec);
+            is->initialized_demuxer = 0;
+            is->initialized_decoder = 0;
+            ffp->is->extradata_diff = 0;
+            ffp->async_init_decoder = 0;
+            ffp->extradata_error    = 1;
+            goto retry_info;
+        }
+        ffp_notify_msg1(ffp, FFP_MSG_FIND_STREAM_INFO);
+        av_log(NULL, AV_LOG_INFO, "nb_streams = %d\n", ic->nb_streams);
     }
+
+    for (i = 0; i < is->ic->nb_streams; i++) {
+        AVCodecParameters *codecpar = is->ic->streams[i]->codecpar;
+        if (codecpar && codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+            ffp_notify_msg3(ffp, FFP_MSG_VIDEO_SIZE_CHANGED, codecpar->width, codecpar->height);
+            ffp_notify_msg3(ffp, FFP_MSG_SAR_CHANGED, codecpar->sample_aspect_ratio.num, codecpar->sample_aspect_ratio.den);
+        }
+    }
+
     if (ic->pb)
         ic->pb->eof_reached = 0; // FIXME hack, ffplay maybe should not use avio_feof() to test for the end
 
@@ -3317,81 +3649,89 @@ static int read_thread(void *arg)
 
     av_dump_format(ic, 0, is->filename, 0);
 
-    int video_stream_count = 0;
-    int h264_stream_count = 0;
-    int first_h264_stream = -1;
-    for (i = 0; i < ic->nb_streams; i++) {
-        AVStream *st = ic->streams[i];
-        enum AVMediaType type = st->codecpar->codec_type;
-        st->discard = AVDISCARD_ALL;
-        if (type >= 0 && ffp->wanted_stream_spec[type] && st_index[type] == -1)
-            if (avformat_match_stream_specifier(ic, st, ffp->wanted_stream_spec[type]) > 0)
-                st_index[type] = i;
+    if (!ffp->async_init_decoder) {
+        int video_stream_count = 0;
+        int h264_stream_count = 0;
+        int first_h264_stream = -1;
+        for (i = 0; i < ic->nb_streams; i++) {
+            AVStream *st = ic->streams[i];
+            enum AVMediaType type = st->codecpar->codec_type;
+            st->discard = AVDISCARD_ALL;
+            if (type >= 0 && ffp->wanted_stream_spec[type] && st_index[type] == -1)
+                if (avformat_match_stream_specifier(ic, st, ffp->wanted_stream_spec[type]) > 0)
+                    st_index[type] = i;
 
-        // choose first h264
+            // choose first h264
 
-        if (type == AVMEDIA_TYPE_VIDEO) {
-            enum AVCodecID codec_id = st->codecpar->codec_id;
-            video_stream_count++;
-            if (codec_id == AV_CODEC_ID_H264) {
-                h264_stream_count++;
-                if (first_h264_stream < 0)
-                    first_h264_stream = i;
+            if (type == AVMEDIA_TYPE_VIDEO) {
+                enum AVCodecID codec_id = st->codecpar->codec_id;
+                video_stream_count++;
+                if (codec_id == AV_CODEC_ID_H264) {
+                    h264_stream_count++;
+                    if (first_h264_stream < 0)
+                        first_h264_stream = i;
+                }
             }
         }
-    }
-    if (video_stream_count > 1 && st_index[AVMEDIA_TYPE_VIDEO] < 0) {
-        st_index[AVMEDIA_TYPE_VIDEO] = first_h264_stream;
-        av_log(NULL, AV_LOG_WARNING, "multiple video stream found, prefer first h264 stream: %d\n", first_h264_stream);
-    }
-    if (!ffp->video_disable)
-        st_index[AVMEDIA_TYPE_VIDEO] =
-            av_find_best_stream(ic, AVMEDIA_TYPE_VIDEO,
-                                st_index[AVMEDIA_TYPE_VIDEO], -1, NULL, 0);
-    if (!ffp->audio_disable)
-        st_index[AVMEDIA_TYPE_AUDIO] =
-            av_find_best_stream(ic, AVMEDIA_TYPE_AUDIO,
-                                st_index[AVMEDIA_TYPE_AUDIO],
-                                st_index[AVMEDIA_TYPE_VIDEO],
-                                NULL, 0);
-    if (!ffp->video_disable && !ffp->subtitle_disable)
-        st_index[AVMEDIA_TYPE_SUBTITLE] =
-            av_find_best_stream(ic, AVMEDIA_TYPE_SUBTITLE,
-                                st_index[AVMEDIA_TYPE_SUBTITLE],
-                                (st_index[AVMEDIA_TYPE_AUDIO] >= 0 ?
-                                 st_index[AVMEDIA_TYPE_AUDIO] :
-                                 st_index[AVMEDIA_TYPE_VIDEO]),
-                                NULL, 0);
+        if (video_stream_count > 1 && st_index[AVMEDIA_TYPE_VIDEO] < 0) {
+            st_index[AVMEDIA_TYPE_VIDEO] = first_h264_stream;
+            av_log(NULL, AV_LOG_WARNING, "multiple video stream found, prefer first h264 stream: %d\n", first_h264_stream);
+        }
+        if (!ffp->video_disable)
+            st_index[AVMEDIA_TYPE_VIDEO] =
+                av_find_best_stream(ic, AVMEDIA_TYPE_VIDEO,
+                                    st_index[AVMEDIA_TYPE_VIDEO], -1, NULL, 0);
+        if (!ffp->audio_disable)
+            st_index[AVMEDIA_TYPE_AUDIO] =
+                av_find_best_stream(ic, AVMEDIA_TYPE_AUDIO,
+                                    st_index[AVMEDIA_TYPE_AUDIO],
+                                    st_index[AVMEDIA_TYPE_VIDEO],
+                                    NULL, 0);
+        if (!ffp->video_disable && !ffp->subtitle_disable)
+            st_index[AVMEDIA_TYPE_SUBTITLE] =
+                av_find_best_stream(ic, AVMEDIA_TYPE_SUBTITLE,
+                                    st_index[AVMEDIA_TYPE_SUBTITLE],
+                                    (st_index[AVMEDIA_TYPE_AUDIO] >= 0 ?
+                                     st_index[AVMEDIA_TYPE_AUDIO] :
+                                     st_index[AVMEDIA_TYPE_VIDEO]),
+                                    NULL, 0);
 
-    is->show_mode = ffp->show_mode;
+        is->show_mode = ffp->show_mode;
 #ifdef FFP_MERGE // bbc: dunno if we need this
-    if (st_index[AVMEDIA_TYPE_VIDEO] >= 0) {
-        AVStream *st = ic->streams[st_index[AVMEDIA_TYPE_VIDEO]];
-        AVCodecParameters *codecpar = st->codecpar;
-        AVRational sar = av_guess_sample_aspect_ratio(ic, st, NULL);
-        if (codecpar->width)
-            set_default_window_size(codecpar->width, codecpar->height, sar);
-    }
+        if (st_index[AVMEDIA_TYPE_VIDEO] >= 0) {
+            AVStream *st = ic->streams[st_index[AVMEDIA_TYPE_VIDEO]];
+            AVCodecParameters *codecpar = st->codecpar;
+            AVRational sar = av_guess_sample_aspect_ratio(ic, st, NULL);
+            if (codecpar->width)
+                set_default_window_size(codecpar->width, codecpar->height, sar);
+        }
 #endif
 
-    /* open the streams */
-    if (st_index[AVMEDIA_TYPE_AUDIO] >= 0) {
-        stream_component_open(ffp, st_index[AVMEDIA_TYPE_AUDIO]);
+        /* open the streams */
+        if (st_index[AVMEDIA_TYPE_AUDIO] >= 0) {
+            stream_component_open(ffp, st_index[AVMEDIA_TYPE_AUDIO]);
+        } else {
+            ffp->av_sync_type = AV_SYNC_VIDEO_MASTER;
+            is->av_sync_type  = ffp->av_sync_type;
+        }
+
+        ret = -1;
+        if (st_index[AVMEDIA_TYPE_VIDEO] >= 0) {
+            ret = stream_component_open(ffp, st_index[AVMEDIA_TYPE_VIDEO]);
+        }
+        if (is->show_mode == SHOW_MODE_NONE)
+            is->show_mode = ret >= 0 ? SHOW_MODE_VIDEO : SHOW_MODE_RDFT;
+
+        if (st_index[AVMEDIA_TYPE_SUBTITLE] >= 0) {
+            stream_component_open(ffp, st_index[AVMEDIA_TYPE_SUBTITLE]);
+        }
+        is->initialized_decoder = 1;
     } else {
-        ffp->av_sync_type = AV_SYNC_VIDEO_MASTER;
-        is->av_sync_type  = ffp->av_sync_type;
+        st_index[AVMEDIA_TYPE_VIDEO]    = 0;
+        st_index[AVMEDIA_TYPE_AUDIO]    = 1;
+        st_index[AVMEDIA_TYPE_SUBTITLE] = AVERROR_STREAM_NOT_FOUND;
     }
 
-    ret = -1;
-    if (st_index[AVMEDIA_TYPE_VIDEO] >= 0) {
-        ret = stream_component_open(ffp, st_index[AVMEDIA_TYPE_VIDEO]);
-    }
-    if (is->show_mode == SHOW_MODE_NONE)
-        is->show_mode = ret >= 0 ? SHOW_MODE_VIDEO : SHOW_MODE_RDFT;
-
-    if (st_index[AVMEDIA_TYPE_SUBTITLE] >= 0) {
-        stream_component_open(ffp, st_index[AVMEDIA_TYPE_SUBTITLE]);
-    }
     ffp_notify_msg1(ffp, FFP_MSG_COMPONENT_OPEN);
 
     if (!ffp->ijkmeta_delay_init) {
@@ -3427,11 +3767,7 @@ static int read_thread(void *arg)
 
     if (!ffp->render_wait_start && !ffp->start_on_prepared)
         toggle_pause(ffp, 1);
-    if (is->video_st && is->video_st->codecpar) {
-        AVCodecParameters *codecpar = is->video_st->codecpar;
-        ffp_notify_msg3(ffp, FFP_MSG_VIDEO_SIZE_CHANGED, codecpar->width, codecpar->height);
-        ffp_notify_msg3(ffp, FFP_MSG_SAR_CHANGED, codecpar->sample_aspect_ratio.num, codecpar->sample_aspect_ratio.den);
-    }
+
     ffp->prepared = true;
     ffp_notify_msg1(ffp, FFP_MSG_PREPARED);
     if (!ffp->render_wait_start && !ffp->start_on_prepared) {
@@ -3446,6 +3782,74 @@ static int read_thread(void *arg)
     /* offset should be seeked*/
     if (ffp->seek_at_start > 0) {
         ffp_seek_to_l(ffp, (long)(ffp->seek_at_start));
+    }
+
+
+    while(!is->initialized_decoder)
+        SDL_Delay(5);
+
+    if (ffp->async_init_decoder) {
+        is->video_st = is->ic->streams[is->video_stream];
+        is->viddec.avctx->pkt_timebase = is->video_st->time_base;
+        is->video_st->discard = AVDISCARD_DEFAULT;
+        avcodec_copy_context(is->video_st->codec, is->viddec.avctx);
+        avcodec_copy_context(is->video_st->internal->avctx, is->video_st->codec);
+        avcodec_parameters_from_context(is->video_st->codecpar, is->video_st->codec);
+
+        is->audio_st = is->ic->streams[is->audio_stream];
+        is->auddec.avctx->pkt_timebase = is->audio_st->time_base;
+        is->audio_st->discard = AVDISCARD_DEFAULT;
+        avcodec_copy_context(is->audio_st->codec, is->auddec.avctx);
+        avcodec_copy_context(is->audio_st->internal->avctx, is->audio_st->codec);
+        avcodec_parameters_from_context(is->audio_st->codecpar, is->audio_st->codec);
+
+        if (is->ic->iformat && !strcmp(is->ic->iformat->name, "concat")) {
+            ConcatContext * cat = ic->priv_data;
+            if (cat) {
+                for (i = 0; i < cat->avf->nb_streams; i++) {
+                    avcodec_copy_context(cat->avf->streams[i]->codec, is->ic->streams[i]->codec);
+                    avcodec_copy_context(cat->avf->streams[i]->internal->avctx, is->ic->streams[i]->internal->avctx);
+                    avcodec_parameters_copy(cat->avf->streams[i]->codecpar, is->ic->streams[i]->codecpar);
+                }
+            }
+        }
+
+        if (ffp->max_fps >= 0) {
+            if(is->video_st->avg_frame_rate.den && is->video_st->avg_frame_rate.num) {
+                double fps = av_q2d(is->video_st->avg_frame_rate);
+                SDL_ProfilerReset(&is->viddec.decode_profiler, fps + 0.5);
+                if (fps > ffp->max_fps && fps < 130.0) {
+                    is->is_video_high_fps = 1;
+                    av_log(ffp, AV_LOG_WARNING, "fps: %lf (too high)\n", fps);
+                } else {
+                    av_log(ffp, AV_LOG_WARNING, "fps: %lf (normal)\n", fps);
+                }
+            }
+            if(is->video_st->r_frame_rate.den && is->video_st->r_frame_rate.num) {
+                double tbr = av_q2d(is->video_st->r_frame_rate);
+                if (tbr > ffp->max_fps && tbr < 130.0) {
+                    is->is_video_high_fps = 1;
+                    av_log(ffp, AV_LOG_WARNING, "fps: %lf (too high)\n", tbr);
+                } else {
+                    av_log(ffp, AV_LOG_WARNING, "fps: %lf (normal)\n", tbr);
+                }
+            }
+        }
+
+        if (is->is_video_high_fps) {
+            is->viddec.avctx->skip_frame       = FFMAX(is->viddec.avctx->skip_frame, AVDISCARD_NONREF);
+            is->viddec.avctx->skip_loop_filter = FFMAX(is->viddec.avctx->skip_loop_filter, AVDISCARD_NONREF);
+            is->viddec.avctx->skip_idct        = FFMAX(is->viddec.avctx->skip_loop_filter, AVDISCARD_NONREF);
+        }
+    }
+
+    is->initialized_demuxer = 1;
+    if (ffp->async_init_decoder) {
+        if ((ret = decoder_start(&is->auddec, audio_thread, ffp, "ff_audio_dec")) < 0)
+            goto fail;
+        if ((ret = decoder_start(&is->viddec, video_thread, ffp, "ff_video_dec")) < 0)
+            goto fail;
+        SDL_AoutPauseAudio(ffp->aout, 0);
     }
 
     for (;;) {
@@ -3679,6 +4083,58 @@ static int read_thread(void *arg)
             is->eof = 0;
         }
 
+        if (ffp->async_init_decoder) {
+            int64_t video_start_time = av_rescale_q(ic->streams[is->video_stream]->start_time,
+                                                    ic->streams[is->video_stream]->time_base,
+                                                    AV_TIME_BASE_Q);
+
+            int64_t audio_start_time = av_rescale_q(ic->streams[is->audio_stream]->start_time,
+                                                    ic->streams[is->audio_stream]->time_base,
+                                                    AV_TIME_BASE_Q);
+
+            if (video_start_time != AV_NOPTS_VALUE && audio_start_time != AV_NOPTS_VALUE) {
+                int diff = 1;
+                if (ic->start_time == AV_NOPTS_VALUE) {
+                    ic->start_time = video_start_time < audio_start_time ? video_start_time : audio_start_time;
+                } else if(ic->start_time > video_start_time){
+                    ic->start_time = video_start_time;
+                } else if(ic->start_time > audio_start_time){
+                    ic->start_time = audio_start_time;
+                } else {
+                    diff = 0;
+                }
+
+                if (diff) {
+                    av_log(NULL, AV_LOG_INFO, "start time differ\n");
+                    if(ffp->show_status)
+                        av_dump_format(ic, 0, is->filename, 0);
+                }
+            }
+
+
+            if (is->ic->iformat && !strcmp(is->ic->iformat->name, "flv")) {
+                FLVContext * flv = ic->priv_data;
+                if (flv && (flv->video_bit_rate != ic->streams[is->video_stream]->codecpar->bit_rate ||
+                    flv->audio_bit_rate != ic->streams[is->audio_stream]->codecpar->bit_rate) ) {
+                    av_log(NULL, AV_LOG_INFO, "bit rate differ\n");
+                    ic->streams[is->video_stream]->codecpar->bit_rate =
+                        ic->streams[is->video_stream]->internal->avctx->bit_rate =
+                        ic->streams[is->video_stream]->codec->bit_rate =
+                        flv->video_bit_rate;
+
+                    ic->streams[is->audio_stream]->codecpar->bit_rate =
+                        ic->streams[is->audio_stream]->internal->avctx->bit_rate =
+                        ic->streams[is->audio_stream]->codec->bit_rate =
+                        flv->audio_bit_rate;
+
+                    ic->bit_rate = flv->video_bit_rate + flv->audio_bit_rate;
+                    if (ffp->show_status) {
+                        av_dump_format(ic, 0, is->filename, 0);
+                    }
+                }
+            }
+        }
+
         if (pkt->flags & AV_PKT_FLAG_DISCONTINUITY) {
             if (is->audio_stream >= 0) {
                 packet_queue_put(&is->audioq, &flush_pkt);
@@ -3749,6 +4205,22 @@ static int read_thread(void *arg)
 }
 
 static int video_refresh_thread(void *arg);
+
+static int guess_decoders(FFPlayer *ffp) {
+    int ret = 0;
+    VideoState *is = ffp->is;
+
+    if ((is->viddec.avctx = create_video_decoder_by_extradata(ffp, ffp->video_extradata)) == NULL)
+        return -1;
+    is->video_stream = 0;
+
+    if ((is->auddec.avctx = create_audio_decoder_by_extradata(ffp, ffp->audio_extradata)) == NULL)
+        return -1;
+    is->audio_stream = 1;
+
+    return ret;
+}
+
 static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputFormat *iformat)
 {
     assert(!ffp->is);
@@ -3761,6 +4233,8 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
     if (!is->filename)
         goto fail;
     is->iformat = iformat;
+    if (ffp->iformat_name && strlen(ffp->iformat_name))
+        is->iformat = av_find_input_format(ffp->iformat_name);
     is->ytop    = 0;
     is->xleft   = 0;
 #if defined(__ANDROID__)
@@ -3830,29 +4304,47 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
     ffp->is = is;
     is->pause_req = !ffp->start_on_prepared;
 
+    if (ffp->async_init_decoder)
+        is->ic = avformat_alloc_context();
+
+    is->initialized_decoder = 0;
+    is->initialized_demuxer = 0;
+    is->extradata_diff      = 0;
+
+
     is->video_refresh_tid = SDL_CreateThreadEx(&is->_video_refresh_tid, video_refresh_thread, ffp, "ff_vout");
     if (!is->video_refresh_tid) {
         av_freep(&ffp->is);
         return NULL;
     }
 
-    is->initialized_decoder = 0;
+
+
+    if (ffp->async_init_decoder) {
+        if (guess_decoders(ffp) < 0)
+            goto fail;
+    }
+
     is->read_tid = SDL_CreateThreadEx(&is->_read_tid, read_thread, ffp, "ff_read");
     if (!is->read_tid) {
         av_log(NULL, AV_LOG_FATAL, "SDL_CreateThread(): %s\n", SDL_GetError());
         goto fail;
     }
 
-    if (ffp->async_init_decoder && !ffp->video_disable && ffp->video_mime_type && strlen(ffp->video_mime_type) > 0
-                    && ffp->mediacodec_default_name && strlen(ffp->mediacodec_default_name) > 0) {
-        if (ffp->mediacodec_all_videos || ffp->mediacodec_avc || ffp->mediacodec_hevc || ffp->mediacodec_mpeg2) {
-            decoder_init(&is->viddec, NULL, &is->videoq, is->continue_read_thread);
-            is->viddec.queue_bak = &is->videoq_bak;
-            ffp->node_vdec = ffpipeline_init_video_decoder(ffp->pipeline, ffp);
-        }
-    }
-    is->initialized_decoder = 1;
+    if (ffp->async_init_decoder) {
+        /* open the decoders*/
+        av_log(ffp, AV_LOG_INFO, "async init decoder\n");
 
+        if (decoder_open(ffp, ffp->is->viddec.avctx) < 0)
+            goto fail;
+
+
+        if (decoder_open(ffp, ffp->is->auddec.avctx) < 0)
+            goto fail;
+
+
+        is->initialized_decoder = 1;
+    }
     return is;
 fail:
     is->initialized_decoder = 1;
@@ -3887,6 +4379,10 @@ static int video_refresh_thread(void *arg)
 {
     FFPlayer *ffp = arg;
     VideoState *is = ffp->is;
+
+    while(!ffp->is->initialized_demuxer)
+        SDL_Delay(5);
+
     double remaining_time = 0.0;
     while (!is->abort_request) {
         if (remaining_time > 0.0)
@@ -5008,7 +5504,12 @@ int ffp_get_video_rotate_degrees(FFPlayer *ffp)
     if (!is)
         return 0;
 
-    int theta  = abs((int)((int64_t)round(fabs(get_rotation(is->video_st))) % 360));
+    int theta;
+    if (ffp->async_init_decoder) {
+        theta = ffp->mediacodec_rotate_degrees;
+    } else {
+        theta = abs((int)((int64_t)round(fabs(get_rotation(is->video_st))) % 360));
+    }
     switch (theta) {
         case 0:
         case 90:
@@ -5212,6 +5713,10 @@ int64_t ffp_get_property_int64(FFPlayer *ffp, int id, int64_t default_value)
             if (!ffp)
                 return default_value;
             return ffp->hw_decode_error_code;
+       case FFP_PROP_INT64_EXTRADATA_ERROR:
+            if (!ffp)
+                return default_value;
+            return ffp->extradata_error;
         default:
             return default_value;
     }

@@ -1467,6 +1467,9 @@ static void func_destroy(IJKFF_Pipenode *node)
     SDL_DestroyCondP(&opaque->acodec_first_dequeue_output_cond);
     SDL_DestroyMutexP(&opaque->acodec_first_dequeue_output_mutex);
 
+    if (opaque->acodec && SDL_AMediaCodec_isConfigured(opaque->acodec))
+        SDL_AMediaCodec_stop(opaque->acodec);
+
     SDL_AMediaCodec_decreaseReferenceP(&opaque->acodec);
     SDL_AMediaFormat_deleteP(&opaque->input_aformat);
     SDL_AMediaFormat_deleteP(&opaque->output_aformat);
