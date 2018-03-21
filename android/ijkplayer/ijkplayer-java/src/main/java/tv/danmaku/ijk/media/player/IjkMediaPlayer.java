@@ -148,6 +148,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     public static final int FFP_PROP_INT64_LATEST_SEEK_LOAD_DURATION        = 20300;
     public static final int FFP_PROP_INT64_IMMEDIATE_RECONNECT              = 20211;
     public static final int FFP_PROP_INT64_HW_DECODEC_ERROR_CODE            = 20212;
+    public static final int FFP_PROP_INT64_EXTRADATA_ERROR                  = 20213;
     //----------------------------------------
 
     public static final int PLAYER_ACTION_IS_INIT    = 10001;
@@ -1848,6 +1849,17 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
             }
         }
         return 0;
+    }
+
+    public boolean isExtradataError() {
+        if (mPlayer != null && mServiceIsConnected) {
+            try {
+                return mPlayer.getPropertyLong(FFP_PROP_INT64_EXTRADATA_ERROR, 0) != 0;
+            } catch (RemoteException e) {
+                onBuglyReport(e);
+            }
+        }
+        return false;
     }
 
     public long getBitRate() {
