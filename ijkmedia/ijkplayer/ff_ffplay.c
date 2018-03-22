@@ -3135,9 +3135,7 @@ out:
 static int decoder_open(FFPlayer *ffp, AVCodecContext * avctx)
 {
     VideoState *is = ffp->is;
-    AVFormatContext *ic = is->ic;
-    AVCodec *codec = NULL;
-    const char *forced_codec_name = NULL;
+    const AVCodec *codec = NULL;
     AVDictionaryEntry *t = NULL;
     int sample_rate, nb_channels;
     int64_t channel_layout;
@@ -3280,7 +3278,7 @@ static int is_realtime(AVFormatContext *s)
     return 0;
 }
 
-static AVCodecContext * create_video_decoder_by_extradata (FFPlayer *ffp, const uint8_t *extradata_enc) {
+static AVCodecContext * create_video_decoder_by_extradata (FFPlayer *ffp, char *extradata_enc) {
     int ret = 0;
     const AVCodec * codec;
     H264ParamSets ps;
@@ -3355,7 +3353,7 @@ static AVCodecContext * create_video_decoder_by_extradata (FFPlayer *ffp, const 
     return avctx;
 }
 
-static AVCodecContext * create_audio_decoder_by_extradata (FFPlayer *ffp, const uint8_t *extradata_enc) {
+static AVCodecContext * create_audio_decoder_by_extradata (FFPlayer *ffp, char *extradata_enc) {
     int ret = 0;
     const AVCodec * pCodec = NULL;
     AVCodecContext * avctx = NULL;
@@ -3415,7 +3413,7 @@ static int check_streams(FFPlayer *ffp, int streams) {
     VideoState *is = ffp->is;
 
     for (i = 0; i < is->ic->nb_streams; i++) {
-        uint8_t * old_extradata =  i == is->video_stream ? ffp->video_extradata_guess :
+        char * old_extradata =  i == is->video_stream ? ffp->video_extradata_guess :
                                    i == is->audio_stream ? ffp->audio_extradata_guess : NULL;
         size_t old_extradata_size = i == is->video_stream ? ffp->video_extradata_size_guess :
                                  i == is->audio_stream ? ffp->audio_extradata_size_guess : 0;
@@ -3456,6 +3454,36 @@ static int check_rotate(FFPlayer *ffp) {
         return ASYNC_ERROR_ROTATE_DIFFER;
     }
     return ASYNC_ERROR_NONE;
+}
+
+static void copy_stream_info(VideoState * is) {
+FF_DISABLE_DEPRECATION_WARNINGS
+    int i;
+    is->video_st = is->ic->streams[is->video_stream];
+    is->viddec.avctx->pkt_timebase = is->video_st->time_base;
+    is->video_st->discard = AVDISCARD_DEFAULT;
+    avcodec_copy_context(is->video_st->codec, is->viddec.avctx);
+    avcodec_copy_context(is->video_st->internal->avctx, is->video_st->codec);
+    avcodec_parameters_from_context(is->video_st->codecpar, is->video_st->codec);
+
+    is->audio_st = is->ic->streams[is->audio_stream];
+    is->auddec.avctx->pkt_timebase = is->audio_st->time_base;
+    is->audio_st->discard = AVDISCARD_DEFAULT;
+    avcodec_copy_context(is->audio_st->codec, is->auddec.avctx);
+    avcodec_copy_context(is->audio_st->internal->avctx, is->audio_st->codec);
+    avcodec_parameters_from_context(is->audio_st->codecpar, is->audio_st->codec);
+
+    if (is->ic->iformat && !strcmp(is->ic->iformat->name, "concat")) {
+        ConcatContext * cat = is->ic->priv_data;
+        if (cat) {
+            for (i = 0; i < cat->avf->nb_streams; i++) {
+                avcodec_copy_context(cat->avf->streams[i]->codec, is->ic->streams[i]->codec);
+                avcodec_copy_context(cat->avf->streams[i]->internal->avctx, is->ic->streams[i]->internal->avctx);
+                avcodec_parameters_copy(cat->avf->streams[i]->codecpar, is->ic->streams[i]->codecpar);
+            }
+        }
+    }
+FF_ENABLE_DEPRECATION_WARNINGS
 }
 
 /* this thread gets the stream from the disk or the network */
@@ -3811,31 +3839,7 @@ retry_info:
         SDL_Delay(5);
 
     if (ffp->async_init_decoder) {
-        is->video_st = is->ic->streams[is->video_stream];
-        is->viddec.avctx->pkt_timebase = is->video_st->time_base;
-        is->video_st->discard = AVDISCARD_DEFAULT;
-        avcodec_copy_context(is->video_st->codec, is->viddec.avctx);
-        avcodec_copy_context(is->video_st->internal->avctx, is->video_st->codec);
-        avcodec_parameters_from_context(is->video_st->codecpar, is->video_st->codec);
-
-        is->audio_st = is->ic->streams[is->audio_stream];
-        is->auddec.avctx->pkt_timebase = is->audio_st->time_base;
-        is->audio_st->discard = AVDISCARD_DEFAULT;
-        avcodec_copy_context(is->audio_st->codec, is->auddec.avctx);
-        avcodec_copy_context(is->audio_st->internal->avctx, is->audio_st->codec);
-        avcodec_parameters_from_context(is->audio_st->codecpar, is->audio_st->codec);
-
-        if (is->ic->iformat && !strcmp(is->ic->iformat->name, "concat")) {
-            ConcatContext * cat = ic->priv_data;
-            if (cat) {
-                for (i = 0; i < cat->avf->nb_streams; i++) {
-                    avcodec_copy_context(cat->avf->streams[i]->codec, is->ic->streams[i]->codec);
-                    avcodec_copy_context(cat->avf->streams[i]->internal->avctx, is->ic->streams[i]->internal->avctx);
-                    avcodec_parameters_copy(cat->avf->streams[i]->codecpar, is->ic->streams[i]->codecpar);
-                }
-            }
-        }
-
+        copy_stream_info(is);
         if (ffp->max_fps >= 0) {
             if(is->video_st->avg_frame_rate.den && is->video_st->avg_frame_rate.num) {
                 double fps = av_q2d(is->video_st->avg_frame_rate);
@@ -4139,6 +4143,8 @@ retry_info:
                 if (flv && (flv->video_bit_rate != ic->streams[is->video_stream]->codecpar->bit_rate ||
                     flv->audio_bit_rate != ic->streams[is->audio_stream]->codecpar->bit_rate) ) {
                     av_log(NULL, AV_LOG_INFO, "bit rate differ\n");
+
+FF_DISABLE_DEPRECATION_WARNINGS
                     ic->streams[is->video_stream]->codecpar->bit_rate =
                         ic->streams[is->video_stream]->internal->avctx->bit_rate =
                         ic->streams[is->video_stream]->codec->bit_rate =
@@ -4148,6 +4154,7 @@ retry_info:
                         ic->streams[is->audio_stream]->internal->avctx->bit_rate =
                         ic->streams[is->audio_stream]->codec->bit_rate =
                         flv->audio_bit_rate;
+FF_DISABLE_DEPRECATION_WARNINGS
 
                     ic->bit_rate = flv->video_bit_rate + flv->audio_bit_rate;
                     if (ffp->show_status) {

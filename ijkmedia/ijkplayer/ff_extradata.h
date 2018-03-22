@@ -372,4 +372,20 @@ extern void avpriv_set_pts_info(AVStream *s, int pts_wrap_bits,
 
 #define H264_NUIT_FIELD_BASED_FLAG 1
 
+#if HAVE_PRAGMA_DEPRECATED
+#    if defined(__ICL) || defined (__INTEL_COMPILER)
+#        define FF_DISABLE_DEPRECATION_WARNINGS __pragma(warning(push)) __pragma(warning(disable:1478))
+#        define FF_ENABLE_DEPRECATION_WARNINGS  __pragma(warning(pop))
+#    elif defined(_MSC_VER)
+#        define FF_DISABLE_DEPRECATION_WARNINGS __pragma(warning(push)) __pragma(warning(disable:4996))
+#        define FF_ENABLE_DEPRECATION_WARNINGS  __pragma(warning(pop))
+#    else
+#        define FF_DISABLE_DEPRECATION_WARNINGS _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"")
+#        define FF_ENABLE_DEPRECATION_WARNINGS  _Pragma("GCC diagnostic pop")
+#    endif
+#else
+#    define FF_DISABLE_DEPRECATION_WARNINGS
+#    define FF_ENABLE_DEPRECATION_WARNINGS
+#endif
+
 #endif
