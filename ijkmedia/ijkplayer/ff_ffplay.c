@@ -3403,6 +3403,12 @@ static AVCodecContext * create_audio_decoder_by_extradata (FFPlayer *ffp, const 
     return avctx;
 }
 
+#define    ASYNC_ERROR_NONE                  0
+#define    ASYNC_ERROR_NO_EXTRADATA         -1
+#define    ASYNC_ERROR_EXTRADATA_DIFFER     -2
+#define    ASYNC_ERROR_ROTATE_DIFFER        -3
+#define    ASYNC_ERROR_FIND_STREAM_INFO     -4
+#define    ASYNC_ERROR_UNKNOWN              -5
 
 static int check_streams(FFPlayer *ffp, int streams) {
     int i;
@@ -3422,21 +3428,35 @@ static int check_streams(FFPlayer *ffp, int streams) {
                     size_t new_extradata_enc_size = AV_BASE64_SIZE(new_extradata_size);
                     char *   new_extradata_enc = av_mallocz(new_extradata_enc_size + 1);
                     if (!new_extradata_enc)
-                        return -1;
+                        return ASYNC_ERROR_UNKNOWN;
                     new_extradata_enc[new_extradata_enc_size] = 0;
 
                     if (!av_base64_encode(new_extradata_enc, new_extradata_enc_size, (const uint8_t *)new_extradata, new_extradata_size))
-                        return -1;
+                        return ASYNC_ERROR_UNKNOWN;
                 av_log(NULL, AV_LOG_INFO, "Stream:%d extradata differ , old = %s, new = %s\n", i,
                        (i == is->video_stream ? ffp->video_extradata : ffp->audio_extradata), new_extradata_enc);
 
-                return -1;
+                return ASYNC_ERROR_EXTRADATA_DIFFER;
             }
         }
     }
-    return 0;
+
+
+    return ASYNC_ERROR_NONE;
 }
 
+static int check_rotate(FFPlayer *ffp) {
+    AVStream * video_st = ffp->is->ic->streams[ffp->is->video_stream];
+    int rotate;
+    if (!video_st)
+        return ASYNC_ERROR_UNKNOWN;
+    rotate =  abs((int)((int64_t)round(fabs(get_rotation(video_st))) % 360));
+    if (rotate) {
+        av_log(NULL, AV_LOG_INFO, "video rotate differ = %d\n", rotate);
+        return ASYNC_ERROR_ROTATE_DIFFER;
+    }
+    return ASYNC_ERROR_NONE;
+}
 
 /* this thread gets the stream from the disk or the network */
 static int read_thread(void *arg)
@@ -3580,10 +3600,12 @@ retry_info:
             goto fail;
         }
     } else {
+        int find_stream_error;
         av_dict_set_int(&ic->metadata, "nb-streams", 2, 0);
         // Disable bitstream filter for time saving
-        if ((avformat_find_stream_info(ffp->is->ic, NULL) < 0) ||
-            (check_streams(ffp, 2) < 0)) {
+        if (((find_stream_error = avformat_find_stream_info(ffp->is->ic, NULL)) < 0) ||
+            ((ret               = check_streams(ffp, 2))                        < 0) ||
+            ((ret               = check_rotate(ffp))                            < 0)) {
             while (!is->initialized_decoder)
                 SDL_Delay(5);
             ffp->is->extradata_diff = 1;
@@ -3600,7 +3622,7 @@ retry_info:
             is->initialized_decoder = 0;
             ffp->is->extradata_diff = 0;
             ffp->async_init_decoder = 0;
-            ffp->extradata_error    = 1;
+            ffp->async_error_code   = (find_stream_error < 0) ? ASYNC_ERROR_FIND_STREAM_INFO : ret;
             goto retry_info;
         }
         ffp_notify_msg1(ffp, FFP_MSG_FIND_STREAM_INFO);
@@ -4303,6 +4325,15 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
     }
     ffp->is = is;
     is->pause_req = !ffp->start_on_prepared;
+
+
+    if (ffp->async_init_decoder) {
+        if (!ffp->video_extradata || !strlen(ffp->video_extradata) ||
+            !ffp->audio_extradata || !strlen(ffp->audio_extradata)) {
+            ffp->async_init_decoder = 0;
+            ffp->async_error_code   = ASYNC_ERROR_NO_EXTRADATA;
+        }
+    }
 
     if (ffp->async_init_decoder)
         is->ic = avformat_alloc_context();
@@ -5713,10 +5744,10 @@ int64_t ffp_get_property_int64(FFPlayer *ffp, int id, int64_t default_value)
             if (!ffp)
                 return default_value;
             return ffp->hw_decode_error_code;
-       case FFP_PROP_INT64_EXTRADATA_ERROR:
+       case FFP_PROP_INT64_ASYNC_ERROR_CODE:
             if (!ffp)
                 return default_value;
-            return ffp->extradata_error;
+            return ffp->async_error_code;
         default:
             return default_value;
     }

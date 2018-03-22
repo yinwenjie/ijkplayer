@@ -597,7 +597,7 @@ typedef struct FFPlayer {
     char * audio_extradata_guess ;
     int video_extradata_size_guess ;
     int audio_extradata_size_guess ;
-    int64_t extradata_error;
+    int64_t async_error_code;
 
     int mediacodec_rotate_degrees;
 
@@ -869,7 +869,7 @@ inline static void ffp_reset_internal(FFPlayer *ffp)
     ffp->video_extradata_size_guess     = 0;
     ffp->audio_extradata_size_guess     = 0;
     ffp->mediacodec_rotate_degrees      = 0;
-    ffp->extradata_error                = 0;
+    ffp->async_error_code = 0;
 
 
     ffp->no_time_adjust                 = 0; // option
