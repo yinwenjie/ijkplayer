@@ -93,7 +93,7 @@ void ijkmp_global_set_inject_callback(ijk_inject_callback cb)
 
 void ijkmp_global_set_log_output_callback(ijk_log_output_callback cb)
 {
-    ffp_global_set_inject_callback(cb);
+    ffp_global_set_log_output_callback(cb);
 }
 
 const char *ijkmp_version()
