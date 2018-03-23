@@ -3631,6 +3631,7 @@ retry_info:
         int find_stream_error;
         av_dict_set_int(&ic->metadata, "nb-streams", 2, 0);
         // Disable bitstream filter for time saving
+        ret = ASYNC_ERROR_NONE;
         if (((find_stream_error = avformat_find_stream_info(ffp->is->ic, NULL)) < 0) ||
             ((ret               = check_streams(ffp, 2))                        < 0) ||
             ((ret               = check_rotate(ffp))                            < 0)) {
