@@ -5756,7 +5756,7 @@ int64_t ffp_get_property_int64(FFPlayer *ffp, int id, int64_t default_value)
                 return default_value;
             return ffp->async_error_code;
         case FFP_PROP_INT64_DEMUX_ERROR_CODE:
-            if (!ffp || !ffp->is && !ffp->is->ic)
+            if (!ffp || !ffp->is || !ffp->is->ic)
                 return default_value;
             return ffp->is->ic->demuxer_status_code;
         default:
