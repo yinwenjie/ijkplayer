@@ -89,14 +89,14 @@ FFmpegApi_av_get_resolution(JNIEnv *env, jclass clazz, jstring in)
     int res[2] = {0};
     jintArray jres = (*env)->NewIntArray(env, 2);
 
-    char * extradata_enc = (*env)->GetStringUTFChars(env, in, NULL);
+    const char * extradata_enc = (*env)->GetStringUTFChars(env, in, NULL);
 
     if (!extradata_enc)
         goto fail;
 
     //Init Video Stream
-    int extradata_size = AV_BASE64_DECODE_SIZE(strlen(extradata_enc)) + AV_INPUT_BUFFER_PADDING_SIZE;
-    char * extradata = av_mallocz(extradata_size);
+    size_t extradata_size = AV_BASE64_DECODE_SIZE(strlen(extradata_enc)) + AV_INPUT_BUFFER_PADDING_SIZE;
+    uint8_t * extradata = av_mallocz(extradata_size);
     int r_extradata_size = av_base64_decode(extradata, extradata_enc, extradata_size);
 
     if ((ff_h264_decode_extradata(extradata, r_extradata_size, &ps,
