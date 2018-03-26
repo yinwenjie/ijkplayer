@@ -2028,12 +2028,6 @@ static int audio_thread(void *arg)
     int64_t deviation2 = 0;
     int64_t deviation3 = 0;
 
-    while(!ffp->is->initialized_demuxer)
-        SDL_Delay(5);
-
-    if (ffp->is->extradata_diff)
-        return 0;
-
     if (!frame)
         return AVERROR(ENOMEM);
 
@@ -2449,12 +2443,6 @@ static int video_thread(void *arg)
     FFPlayer *ffp = (FFPlayer *)arg;
     int       ret = 0;
 
-    while(!ffp->is->initialized_demuxer)
-        SDL_Delay(5);
-
-    if (ffp->is->extradata_diff)
-        return 0;
-
     if (ffp->node_vdec) {
         ret = ffpipenode_run_sync(ffp->node_vdec);
     }
@@ -2772,10 +2760,7 @@ static void sdl_audio_callback(void *opaque, Uint8 *stream, int len)
 
     while (len > 0) {
         if (is->audio_buf_index >= is->audio_buf_size) {
-           if (!is->initialized_demuxer)
-               audio_size = -1;
-           else
-               audio_size = audio_decode_frame(ffp);
+           audio_size = audio_decode_frame(ffp);
            if (audio_size < 0) {
                 /* if error, just output silence */
                is->audio_buf = NULL;
@@ -3305,6 +3290,12 @@ static AVCodecContext * create_video_decoder_by_extradata (FFPlayer *ffp, char *
     avctx->extradata = av_mallocz(extradata_size);
     avctx->extradata_size = av_base64_decode(avctx->extradata, extradata_enc, extradata_size);
 
+    //sizeof(HEVCDecoderConfigurationRecord) > sizeof(AVCDecoderConfigurationRecord) >= 7 bytes
+    if (avctx->extradata_size < 7) {
+        av_log(NULL, AV_LOG_ERROR, "Wrong video extradata length\n");
+        return NULL;
+    }
+
     ffp->video_extradata_guess = av_malloc(avctx->extradata_size);
     memcpy(ffp->video_extradata_guess, avctx->extradata, avctx->extradata_size);
     ffp->video_extradata_size_guess = avctx->extradata_size;
@@ -3375,6 +3366,11 @@ static AVCodecContext * create_audio_decoder_by_extradata (FFPlayer *ffp, char *
     avctx->extradata_size = av_base64_decode(avctx->extradata, extradata_enc, extradata_size);
 
 
+    //sizeof(AudioSpecificConfig) >= 2
+    if (avctx->extradata_size < 2) {
+        av_log(NULL, AV_LOG_ERROR, "Wrong audio extradata length\n");
+        return NULL;
+    }
     ffp->audio_extradata_guess = av_malloc(avctx->extradata_size);
     memcpy(ffp->audio_extradata_guess, avctx->extradata, avctx->extradata_size);
     ffp->audio_extradata_size_guess = avctx->extradata_size;
@@ -3406,7 +3402,14 @@ static AVCodecContext * create_audio_decoder_by_extradata (FFPlayer *ffp, char *
 #define    ASYNC_ERROR_EXTRADATA_DIFFER     -2
 #define    ASYNC_ERROR_ROTATE_DIFFER        -3
 #define    ASYNC_ERROR_FIND_STREAM_INFO     -4
-#define    ASYNC_ERROR_UNKNOWN              -5
+#define    ASYNC_ERROR_INIT_VCODEC          -5
+#define    ASYNC_ERROR_INIT_ACODEC          -6
+#define    ASYNC_ERROR_VCODEC_EXTRADATA     -7
+#define    ASYNC_ERROR_ACODEC_EXTRADATA     -8
+#define    ASYNC_ERROR_UNKNOWN              -9
+
+#define    ASYNC_INIT_VCODEC_FAIL           (1 << 0)
+#define    ASYNC_INIT_ACODEC_FAIL           (1 << 1)
 
 static int check_streams(FFPlayer *ffp, int streams) {
     int i;
@@ -3442,6 +3445,24 @@ static int check_streams(FFPlayer *ffp, int streams) {
 
     return ASYNC_ERROR_NONE;
 }
+
+static int check_decoders(FFPlayer *ffp) {
+    VideoState *is = ffp->is;
+
+    while(!is->initialized_decoder)
+        SDL_Delay(5);
+
+    if (is->async_init_flags & ASYNC_INIT_VCODEC_FAIL)
+        return ASYNC_ERROR_INIT_VCODEC;
+
+    if (is->async_init_flags & ASYNC_INIT_ACODEC_FAIL)
+        return ASYNC_ERROR_INIT_ACODEC;
+
+    return ASYNC_ERROR_NONE;
+}
+
+
+
 
 static int check_rotate(FFPlayer *ffp) {
     AVStream * video_st = ffp->is->ic->streams[ffp->is->video_stream];
@@ -3556,10 +3577,14 @@ retry_info:
         av_dict_set_int(&ffp->format_opts, "skip-calc-frame-rate", ffp->skip_calc_frame_rate, 0);
     }
 
+    // Disable bitstream filter for time saving
     if (ffp->async_init_decoder) {
         av_dict_set_int(&ffp->format_opts, "nb-streams",   2, 0);
         av_dict_set_int(&ffp->format_opts, "auto_convert", 0, 0);
     }
+
+    if (ffp->iformat_name && strlen(ffp->iformat_name))
+        is->iformat = av_find_input_format(ffp->iformat_name);
     err = avformat_open_input(&ic, is->filename, is->iformat, &ffp->format_opts);
     if (err < 0) {
         print_error(is->filename, err);
@@ -3630,15 +3655,11 @@ retry_info:
     } else {
         int find_stream_error;
         av_dict_set_int(&ic->metadata, "nb-streams", 2, 0);
-        // Disable bitstream filter for time saving
         ret = ASYNC_ERROR_NONE;
         if (((find_stream_error = avformat_find_stream_info(ffp->is->ic, NULL)) < 0) ||
             ((ret               = check_streams(ffp, 2))                        < 0) ||
+            ((ret               = check_decoders(ffp))                          < 0) ||
             ((ret               = check_rotate(ffp))                            < 0)) {
-            while (!is->initialized_decoder)
-                SDL_Delay(5);
-            ffp->is->extradata_diff = 1;
-            is->initialized_demuxer = 1;
             stream_component_close(ffp, is->video_stream);
             stream_component_close(ffp, is->audio_stream);
             av_dict_set_int(&ffp->format_opts, "auto_convert", 1, 0);
@@ -3647,11 +3668,13 @@ retry_info:
             av_log(NULL, AV_LOG_INFO, "rebuild context\n");
             if (ffp->node_vdec)
                 ffpipenode_free_p(&ffp->node_vdec);
-            is->initialized_demuxer = 0;
             is->initialized_decoder = 0;
-            ffp->is->extradata_diff = 0;
+            is->async_init_flags    = 0;
             ffp->async_init_decoder = 0;
             ffp->async_error_code   = (find_stream_error < 0) ? ASYNC_ERROR_FIND_STREAM_INFO : ret;
+            if (find_stream_error < 0) {
+                av_log(NULL, AV_LOG_ERROR, "Find stream info error code = %d\n", find_stream_error);
+            }
             goto retry_info;
         }
         ffp_notify_msg1(ffp, FFP_MSG_FIND_STREAM_INFO);
@@ -3778,8 +3801,8 @@ retry_info:
         }
         is->initialized_decoder = 1;
     } else {
-        st_index[AVMEDIA_TYPE_VIDEO]    = 0;
-        st_index[AVMEDIA_TYPE_AUDIO]    = 1;
+        st_index[AVMEDIA_TYPE_VIDEO]    = is->video_stream;
+        st_index[AVMEDIA_TYPE_AUDIO]    = is->audio_stream;
         st_index[AVMEDIA_TYPE_SUBTITLE] = AVERROR_STREAM_NOT_FOUND;
     }
 
@@ -3835,10 +3858,7 @@ retry_info:
         ffp_seek_to_l(ffp, (long)(ffp->seek_at_start));
     }
 
-
-    while(!is->initialized_decoder)
-        SDL_Delay(5);
-
+    // copy pre-init codec to each stream
     if (ffp->async_init_decoder) {
         copy_stream_info(is);
         if (ffp->max_fps >= 0) {
@@ -3870,7 +3890,6 @@ retry_info:
         }
     }
 
-    is->initialized_demuxer = 1;
     if (ffp->async_init_decoder) {
         if ((ret = decoder_start(&is->auddec, audio_thread, ffp, "ff_audio_dec")) < 0)
             goto fail;
@@ -4240,12 +4259,20 @@ static int guess_decoders(FFPlayer *ffp) {
     int ret = 0;
     VideoState *is = ffp->is;
 
-    if ((is->viddec.avctx = create_video_decoder_by_extradata(ffp, ffp->video_extradata)) == NULL)
-        return -1;
+    if (!ffp->video_extradata || !strlen(ffp->video_extradata) ||
+        !ffp->audio_extradata || !strlen(ffp->audio_extradata)) {
+        return ASYNC_ERROR_NO_EXTRADATA;
+    }
+
+    if ((is->viddec.avctx = create_video_decoder_by_extradata(ffp, ffp->video_extradata)) == NULL) {
+        return ASYNC_ERROR_VCODEC_EXTRADATA;
+    }
     is->video_stream = 0;
 
-    if ((is->auddec.avctx = create_audio_decoder_by_extradata(ffp, ffp->audio_extradata)) == NULL)
-        return -1;
+    if ((is->auddec.avctx = create_audio_decoder_by_extradata(ffp, ffp->audio_extradata)) == NULL) {
+        avcodec_free_context(&is->viddec.avctx);
+        return  ASYNC_ERROR_ACODEC_EXTRADATA;
+    }
     is->audio_stream = 1;
 
     return ret;
@@ -4263,8 +4290,6 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
     if (!is->filename)
         goto fail;
     is->iformat = iformat;
-    if (ffp->iformat_name && strlen(ffp->iformat_name))
-        is->iformat = av_find_input_format(ffp->iformat_name);
     is->ytop    = 0;
     is->xleft   = 0;
 #if defined(__ANDROID__)
@@ -4336,32 +4361,21 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
 
 
     if (ffp->async_init_decoder) {
-        if (!ffp->video_extradata || !strlen(ffp->video_extradata) ||
-            !ffp->audio_extradata || !strlen(ffp->audio_extradata)) {
+        if ((ffp->async_error_code = guess_decoders(ffp)) < 0) {
             ffp->async_init_decoder = 0;
-            ffp->async_error_code   = ASYNC_ERROR_NO_EXTRADATA;
+        } else {
+            is->ic = avformat_alloc_context();
         }
     }
 
-    if (ffp->async_init_decoder)
-        is->ic = avformat_alloc_context();
-
     is->initialized_decoder = 0;
-    is->initialized_demuxer = 0;
-    is->extradata_diff      = 0;
+    is->async_init_flags = 0;
 
 
     is->video_refresh_tid = SDL_CreateThreadEx(&is->_video_refresh_tid, video_refresh_thread, ffp, "ff_vout");
     if (!is->video_refresh_tid) {
         av_freep(&ffp->is);
         return NULL;
-    }
-
-
-
-    if (ffp->async_init_decoder) {
-        if (guess_decoders(ffp) < 0)
-            goto fail;
     }
 
     is->read_tid = SDL_CreateThreadEx(&is->_read_tid, read_thread, ffp, "ff_read");
@@ -4374,13 +4388,13 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
         /* open the decoders*/
         av_log(ffp, AV_LOG_INFO, "async init decoder\n");
 
-        if (decoder_open(ffp, ffp->is->viddec.avctx) < 0)
-            goto fail;
+        if (decoder_open(ffp, ffp->is->viddec.avctx) < 0) {
+            is->async_init_flags |= ASYNC_INIT_VCODEC_FAIL;
+        }
 
-
-        if (decoder_open(ffp, ffp->is->auddec.avctx) < 0)
-            goto fail;
-
+        if (decoder_open(ffp, ffp->is->auddec.avctx) < 0) {
+            is->async_init_flags |= ASYNC_INIT_ACODEC_FAIL;
+        }
 
         is->initialized_decoder = 1;
     }
@@ -4418,9 +4432,6 @@ static int video_refresh_thread(void *arg)
 {
     FFPlayer *ffp = arg;
     VideoState *is = ffp->is;
-
-    while(!ffp->is->initialized_demuxer)
-        SDL_Delay(5);
 
     double remaining_time = 0.0;
     while (!is->abort_request) {
