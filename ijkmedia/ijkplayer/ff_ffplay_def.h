@@ -434,9 +434,9 @@ typedef struct VideoState {
     SDL_mutex *accurate_seek_mutex;
     SDL_cond  *video_accurate_seek_cond;
     SDL_cond  *audio_accurate_seek_cond;
+
+    uint32_t async_init_flags;
     volatile int initialized_decoder;
-    volatile int initialized_demuxer;
-    volatile int extradata_diff;
     int seek_buffering;
 } VideoState;
 
