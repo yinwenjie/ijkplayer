@@ -122,7 +122,7 @@ static const AVOption ffp_context_options[] = {
                                                        VIDEO_PICTURE_QUEUE_SIZE_MAX) },
 
     { "max-buffer-size",                    "max buffer size should be pre-read",
-        OPTION_OFFSET(dcc.max_buffer_size), OPTION_INT(MAX_QUEUE_SIZE, 0, MAX_QUEUE_SIZE) },
+        OPTION_OFFSET(dcc.max_buffer_size), OPTION_INT(DEFAULT_QUEUE_SIZE, 0, MAX_QUEUE_SIZE) },
     { "min-frames",                         "minimal frames to stop pre-reading",
         OPTION_OFFSET(dcc.min_frames),      OPTION_INT(DEFAULT_MIN_FRAMES, MIN_MIN_FRAMES, MAX_MIN_FRAMES) },
     { "first-high-water-mark-ms",           "first chance to wakeup read_thread",
@@ -166,6 +166,8 @@ static const AVOption ffp_context_options[] = {
         OPTION_OFFSET(video_mime_type),     OPTION_STR(NULL) },
     { "hw-decode-fallback-enable",          "try fallback to ffplay decoder when hw decode fail",
         OPTION_OFFSET(hw_decode_fallback_enable),      OPTION_INT(0, 0, 1) },
+    { "max-cache-time",                         "max cache time",
+        OPTION_OFFSET(max_cache_time),      OPTION_INT(DEFAULT_CACHE_TIME, MIN_CACHE_TIME, MAX_CACHE_TIME) },
 
         // iOS only options
     { "videotoolbox",                       "VideoToolbox: enable",
