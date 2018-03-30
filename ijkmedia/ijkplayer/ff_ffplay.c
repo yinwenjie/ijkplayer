@@ -962,7 +962,7 @@ static void video_image_display2(FFPlayer *ffp)
             int latest_video_seek_load_serial = __atomic_exchange_n(&(is->latest_video_seek_load_serial), -1, memory_order_seq_cst);
             if (latest_video_seek_load_serial == vp->serial) {
                 ffp->stat.latest_seek_load_duration = (av_gettime() - is->latest_seek_load_start_at) / 1000;
-                if (ffp->av_sync_type == AV_SYNC_VIDEO_MASTER) {
+                if (ffp->av_sync_type == AV_SYNC_VIDEO_MASTER || ffp->av_sync_type == AV_SYNC_EXTERNAL_CLOCK) {
                     ffp_notify_msg2(ffp, FFP_MSG_VIDEO_SEEK_RENDERING_START, 1);
                 } else {
                     ffp_notify_msg2(ffp, FFP_MSG_VIDEO_SEEK_RENDERING_START, 0);
@@ -3785,7 +3785,7 @@ retry_info:
         if (st_index[AVMEDIA_TYPE_AUDIO] >= 0) {
             stream_component_open(ffp, st_index[AVMEDIA_TYPE_AUDIO]);
         } else {
-            ffp->av_sync_type = AV_SYNC_VIDEO_MASTER;
+            ffp->av_sync_type = AV_SYNC_EXTERNAL_CLOCK;
             is->av_sync_type  = ffp->av_sync_type;
         }
 
@@ -5538,6 +5538,9 @@ void ffp_set_playback_rate(FFPlayer *ffp, float rate)
     av_log(ffp, AV_LOG_INFO, "Playback rate: %f\n", rate);
     ffp->pf_playback_rate = rate;
     ffp->pf_playback_rate_changed = 1;
+    if (ffp->av_sync_type == AV_SYNC_EXTERNAL_CLOCK && ffp->is) {
+        set_clock_speed(&ffp->is->extclk, rate);
+    }
 }
 
 void ffp_set_playback_volume(FFPlayer *ffp, float volume)
