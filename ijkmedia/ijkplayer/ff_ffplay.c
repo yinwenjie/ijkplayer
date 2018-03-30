@@ -4015,6 +4015,14 @@ retry_info:
             is->queue_attachments_req = 0;
         }
 
+        if (ic->bit_rate > 0) {
+            int cache_size = (ic->bit_rate * ffp->max_cache_time) / 8;
+            if (cache_size < ffp->dcc.max_buffer_size) {
+                ffp->dcc.max_buffer_size = cache_size;
+            }
+        } else {
+            ffp->dcc.max_buffer_size = DEFAULT_QUEUE_SIZE;
+        }
         /* if the queue are full, no need to read more */
         if (ffp->infinite_buffer<1 && !is->seek_req &&
 #ifdef FFP_MERGE

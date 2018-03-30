@@ -82,7 +82,8 @@
 #define FAST_BUFFERING_CHECK_PER_MILLISECONDS   (50)
 #define MAX_RETRY_CONVERT_IMAGE                 (3)
 
-#define MAX_QUEUE_SIZE (15 * 1024 * 1024)
+#define DEFAULT_QUEUE_SIZE (15 * 1024 * 1024)
+#define MAX_QUEUE_SIZE (30 * 1024 * 1024)
 #define MAX_ACCURATE_SEEK_TIMEOUT (5000)
 #ifdef FFP_MERGE
 #define MIN_FRAMES 25
@@ -151,6 +152,10 @@ static unsigned sws_flags = SWS_BICUBIC;
 #define FRAME_OUTPUT_IMG_PATH_LEN 1024
 
 #define UNKNOWN_FINISH -10001
+
+#define DEFAULT_CACHE_TIME  20   // 20ms
+#define MIN_CACHE_TIME      1
+#define MAX_CACHE_TIME      180
 
 enum FrameOutputTaskStatus {
     TASK_IDLE = -1, TASK_WAIT_TODO = 0, TASK_DOING = 1
@@ -560,7 +565,7 @@ typedef struct FFDemuxCacheControl
 inline static void ffp_reset_demux_cache_control(FFDemuxCacheControl *dcc)
 {
     dcc->min_frames                = DEFAULT_MIN_FRAMES;
-    dcc->max_buffer_size           = MAX_QUEUE_SIZE;
+    dcc->max_buffer_size           = DEFAULT_QUEUE_SIZE;
     dcc->high_water_mark_in_bytes  = DEFAULT_HIGH_WATER_MARK_IN_BYTES;
 
     dcc->first_high_water_mark_in_ms    = DEFAULT_FIRST_HIGH_WATER_MARK_IN_MS;
@@ -756,6 +761,7 @@ typedef struct FFPlayer {
     SDL_cond  *frame_output_cond;
     int hw_decode_fallback_enable;
     int hw_decode_error_code;
+    int max_cache_time;
 } FFPlayer;
 
 #define fftime_to_milliseconds(ts) (av_rescale(ts, 1000, AV_TIME_BASE))
@@ -881,6 +887,7 @@ inline static void ffp_reset_internal(FFPlayer *ffp)
     ffp->need_delete_task_time          = -1;
     ffp->hw_decode_fallback_enable      = 0;
     ffp->hw_decode_error_code           = 0;
+    ffp->max_cache_time                 = 0;
 
     ijkmeta_reset(ffp->meta);
 
