@@ -3117,10 +3117,11 @@ out:
     return ret;
 }
 
-static int decoder_open(FFPlayer *ffp, AVCodecContext * avctx)
+static int decoder_open(FFPlayer *ffp, AVCodecContext ** pavctx)
 {
     VideoState *is = ffp->is;
     const AVCodec *codec = NULL;
+    AVCodecContext * avctx = *pavctx;
     AVDictionaryEntry *t = NULL;
     int sample_rate, nb_channels;
     int64_t channel_layout;
@@ -3224,7 +3225,7 @@ static int decoder_open(FFPlayer *ffp, AVCodecContext * avctx)
     goto out;
 
 fail:
-    avcodec_free_context(&avctx);
+    avcodec_free_context(pavctx);
 out:
 
     return ret;
@@ -3341,6 +3342,12 @@ static AVCodecContext * create_video_decoder_by_extradata (FFPlayer *ffp, char *
     avctx->pix_fmt = AV_PIX_FMT_YUV420P;
     avctx->codec_type = AVMEDIA_TYPE_VIDEO;
 
+    if (avctx->width > 4096 || avctx->height > 4096 ||
+        avctx->width <= 0   || avctx->height <= 0) {
+        av_log(NULL, AV_LOG_ERROR,  "Error resolution: %dx%d\n", avctx->width, avctx->height);
+        return NULL;
+    }
+
     return avctx;
 }
 
@@ -3394,6 +3401,13 @@ static AVCodecContext * create_audio_decoder_by_extradata (FFPlayer *ffp, char *
     avctx->frame_size = m4ac.frame_length_short ? 960 : 1024;
     avctx->frame_size <<= (m4ac.sbr == 1) ? m4ac.ext_sample_rate > m4ac.sample_rate : 0;
 
+
+    if (avctx->sample_rate > 960000 ||
+        avctx->sample_rate <= 0) {
+        av_log(NULL, AV_LOG_ERROR,  "Error sample rate: %d\n", avctx->sample_rate);
+        return NULL;
+    }
+
     return avctx;
 }
 
@@ -3423,7 +3437,7 @@ static int check_streams(FFPlayer *ffp, int streams) {
         uint8_t * new_extradata = is->ic->streams[i]->codecpar->extradata;
         size_t new_extradata_size = is->ic->streams[i]->codecpar->extradata_size;
         if (new_extradata) {
-            av_log(NULL, AV_LOG_INFO, "Stream:%d new extradata\n", i);
+            av_log(NULL, AV_LOG_ERROR, "Stream:%d new extradata\n", i);
             if (old_extradata_size !=  new_extradata_size ||
                 memcmp(old_extradata, new_extradata, new_extradata_size)) {
                     size_t new_extradata_enc_size = AV_BASE64_SIZE(new_extradata_size);
@@ -3434,7 +3448,7 @@ static int check_streams(FFPlayer *ffp, int streams) {
 
                     if (!av_base64_encode(new_extradata_enc, new_extradata_enc_size, (const uint8_t *)new_extradata, new_extradata_size))
                         return ASYNC_ERROR_UNKNOWN;
-                av_log(NULL, AV_LOG_INFO, "Stream:%d extradata differ , old = %s, new = %s\n", i,
+                av_log(NULL, AV_LOG_ERROR, "Stream:%d extradata differ , old = %s, new = %s\n", i,
                        (i == is->video_stream ? ffp->video_extradata : ffp->audio_extradata), new_extradata_enc);
 
                 return ASYNC_ERROR_EXTRADATA_DIFFER;
@@ -3471,7 +3485,7 @@ static int check_rotate(FFPlayer *ffp) {
         return ASYNC_ERROR_UNKNOWN;
     rotate =  abs((int)((int64_t)round(fabs(get_rotation(video_st))) % 360));
     if (rotate) {
-        av_log(NULL, AV_LOG_INFO, "video rotate differ = %d\n", rotate);
+        av_log(NULL, AV_LOG_ERROR, "video rotate differ = %d\n", rotate);
         return ASYNC_ERROR_ROTATE_DIFFER;
     }
     return ASYNC_ERROR_NONE;
@@ -3589,6 +3603,10 @@ retry_info:
     if (err < 0) {
         print_error(is->filename, err);
         ret = -1;
+        if (ffp->async_init_decoder) {
+            while (!is->initialized_decoder)
+                SDL_Delay(5);
+        }
         goto fail;
     }
     ffp_notify_msg1(ffp, FFP_MSG_OPEN_INPUT);
@@ -3660,12 +3678,16 @@ retry_info:
             ((ret               = check_streams(ffp, 2))                        < 0) ||
             ((ret               = check_decoders(ffp))                          < 0) ||
             ((ret               = check_rotate(ffp))                            < 0)) {
-            stream_component_close(ffp, is->video_stream);
-            stream_component_close(ffp, is->audio_stream);
+            av_log(NULL, AV_LOG_ERROR, "rebuild context\n");
+            if (is->video_stream >= 0)
+                stream_component_close(ffp, is->video_stream);
+            if (is->audio_stream >= 0)
+                stream_component_close(ffp, is->audio_stream);
             av_dict_set_int(&ffp->format_opts, "auto_convert", 1, 0);
             av_dict_set_int(&ffp->format_opts, "nb-streams", 0, 0);
-            avformat_close_input(&ic);
-            av_log(NULL, AV_LOG_INFO, "rebuild context\n");
+            if (ic)
+                avformat_close_input(&ic);
+            is->ic = NULL;
             if (ffp->node_vdec)
                 ffpipenode_free_p(&ffp->node_vdec);
             is->initialized_decoder = 0;
@@ -4394,13 +4416,15 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
 
     if (ffp->async_init_decoder) {
         /* open the decoders*/
-        av_log(ffp, AV_LOG_INFO, "async init decoder\n");
+        av_log(ffp, AV_LOG_ERROR, "async init decoder\n");
 
-        if (decoder_open(ffp, ffp->is->viddec.avctx) < 0) {
+        if (decoder_open(ffp, &ffp->is->viddec.avctx) < 0) {
+            av_log(NULL, AV_LOG_ERROR, "open video codec fail\n");
             is->async_init_flags |= ASYNC_INIT_VCODEC_FAIL;
         }
 
-        if (decoder_open(ffp, ffp->is->auddec.avctx) < 0) {
+        if (decoder_open(ffp, &ffp->is->auddec.avctx) < 0) {
+            av_log(NULL, AV_LOG_ERROR, "open audio codec fail\n");
             is->async_init_flags |= ASYNC_INIT_ACODEC_FAIL;
         }
 
