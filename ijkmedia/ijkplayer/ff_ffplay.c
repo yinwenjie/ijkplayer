@@ -981,7 +981,7 @@ static void stream_component_close(FFPlayer *ffp, int stream_index)
     AVFormatContext *ic = is->ic;
     AVCodecParameters *codecpar;
 
-    if (stream_index < 0 || stream_index >= ic->nb_streams)
+    if (!ic || stream_index < 0 || stream_index >= ic->nb_streams)
         return;
     codecpar = ic->streams[stream_index]->codecpar;
 
@@ -3189,10 +3189,6 @@ static int decoder_open(FFPlayer *ffp, AVCodecContext ** pavctx)
 
         decoder_init(&is->auddec, avctx, &is->audioq, is->continue_read_thread);
 
-        if (is->ic->iformat && (is->ic->iformat->flags & (AVFMT_NOBINSEARCH | AVFMT_NOGENSEARCH | AVFMT_NO_BYTE_SEEK)) && !is->ic->iformat->read_seek) {
-            is->auddec.start_pts = is->audio_st->start_time;
-            is->auddec.start_pts_tb = is->audio_st->time_base;
-        }
         break;
     case AVMEDIA_TYPE_VIDEO:
         if (!ffp->video_disable && ffp->video_mime_type && strlen(ffp->video_mime_type) > 0
@@ -3562,11 +3558,7 @@ retry_info:
 
     is->eof = 0;
 
-    if (!ffp->async_init_decoder) {
-        ic = avformat_alloc_context();
-    } else {
-        ic = is->ic;
-    }
+    ic = avformat_alloc_context();
 
     if (!ic) {
         av_log(NULL, AV_LOG_FATAL, "Could not allocate context.\n");
@@ -3607,6 +3599,7 @@ retry_info:
             while (!is->initialized_decoder)
                 SDL_Delay(5);
         }
+        av_log(NULL, AV_LOG_ERROR, "Open input url fail\n");
         goto fail;
     }
     ffp_notify_msg1(ffp, FFP_MSG_OPEN_INPUT);
@@ -3910,6 +3903,12 @@ retry_info:
             is->viddec.avctx->skip_loop_filter = FFMAX(is->viddec.avctx->skip_loop_filter, AVDISCARD_NONREF);
             is->viddec.avctx->skip_idct        = FFMAX(is->viddec.avctx->skip_loop_filter, AVDISCARD_NONREF);
         }
+
+        if (is->ic->iformat && (is->ic->iformat->flags & (AVFMT_NOBINSEARCH | AVFMT_NOGENSEARCH | AVFMT_NO_BYTE_SEEK)) && !is->ic->iformat->read_seek) {
+            is->auddec.start_pts = is->audio_st->start_time;
+            is->auddec.start_pts_tb = is->audio_st->time_base;
+        }
+
     }
 
     if (ffp->async_init_decoder) {
@@ -4392,9 +4391,8 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
 
     if (ffp->async_init_decoder) {
         if ((ffp->async_error_code = guess_decoders(ffp)) < 0) {
+            av_log(NULL, AV_LOG_ERROR, "Guess decoders fail, error code = %d\n", ffp->async_error_code);
             ffp->async_init_decoder = 0;
-        } else {
-            is->ic = avformat_alloc_context();
         }
     }
 
@@ -4416,7 +4414,7 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
 
     if (ffp->async_init_decoder) {
         /* open the decoders*/
-        av_log(ffp, AV_LOG_ERROR, "async init decoder\n");
+        av_log(ffp, AV_LOG_ERROR, "async init decoder begin\n");
 
         if (decoder_open(ffp, &ffp->is->viddec.avctx) < 0) {
             av_log(NULL, AV_LOG_ERROR, "open video codec fail\n");
@@ -4428,10 +4426,12 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
             is->async_init_flags |= ASYNC_INIT_ACODEC_FAIL;
         }
 
+        av_log(NULL, AV_LOG_ERROR, "async init decoder end\n");
         is->initialized_decoder = 1;
     }
     return is;
 fail:
+    av_log(NULL, AV_LOG_ERROR, "stream open fail\n");
     is->initialized_decoder = 1;
     is->abort_request = true;
     if (is->video_refresh_tid)
