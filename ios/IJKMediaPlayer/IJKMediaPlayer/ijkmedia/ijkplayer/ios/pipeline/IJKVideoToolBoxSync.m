@@ -45,6 +45,8 @@
 
 #define MAX_PKT_QUEUE_DEEP   350
 
+#define VTB_DECODE_ERROR -1
+
 typedef struct sample_info {
 
     double  sort;
@@ -99,7 +101,7 @@ struct Ijk_VideoToolBox_Opaque {
 
     int                         serial;
     bool                        dealloced;
-
+    int                         hw_decode_error_code;
 };
 
 static void vtbformat_destroy(VTBFormatDesc *fmt_desc);
@@ -288,6 +290,7 @@ static void VTDecoderCallback(void *decompressionOutputRefCon,
             goto failed;
 
         if (status != 0) {
+            ctx->hw_decode_error_code = status;
             av_log(NULL, AV_LOG_ERROR, "decode callback %d %s\n", (int)status, vtb_get_error_string(status));
             goto failed;
         }
@@ -574,7 +577,7 @@ static int decode_video_internal(Ijk_VideoToolBox_Opaque* context, AVCodecContex
     }
 
     if (status != 0) {
-
+        context->hw_decode_error_code = status;
         av_log(NULL, AV_LOG_ERROR, "decodeFrame %d %s\n", (int)status, vtb_get_error_string(status));
 
         if (status == kVTInvalidSessionErr) {
@@ -833,6 +836,7 @@ int videotoolbox_sync_decode_frame(Ijk_VideoToolBox_Opaque* context)
     do {
         int ret = -1;
         if (is->abort_request || d->queue->abort_request) {
+            ffp->hw_decode_error_code = context->hw_decode_error_code;
             return -1;
         }
 
@@ -842,8 +846,10 @@ int videotoolbox_sync_decode_frame(Ijk_VideoToolBox_Opaque* context)
                 if (d->queue->nb_packets == 0)
                     SDL_CondSignal(d->empty_queue_cond);
                 ffp_video_statistic_l(ffp);
-                if (ffp_packet_queue_get_or_buffering(ffp, d->queue, &pkt, &d->pkt_serial, &d->finished) < 0)
+                if (ffp_packet_queue_get_or_buffering(ffp, d->queue, &pkt, &d->pkt_serial, &d->finished) < 0) {
+                    ffp->hw_decode_error_code = context->hw_decode_error_code;
                     return -1;
+                }
                 if (ffp_is_flush_packet(&pkt)) {
                     avcodec_flush_buffers(d->avctx);
                     context->refresh_request = true;
@@ -883,6 +889,7 @@ int videotoolbox_sync_decode_frame(Ijk_VideoToolBox_Opaque* context)
             }
         }
     } while (!got_frame && !d->finished);
+    ffp->hw_decode_error_code = context->hw_decode_error_code;
     return got_frame;
 }
 
