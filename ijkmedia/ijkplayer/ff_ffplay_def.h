@@ -443,6 +443,7 @@ typedef struct VideoState {
     /* Only used for async-init-decoder */
     uint32_t async_init_flags;
     volatile int initialized_decoder;
+    int          nb_streams_guess;
     AVDictionary *orig_format_opts;
     AVDictionary *orig_codec_opts;
     AVDictionary *orig_sws_dict;
@@ -610,6 +611,7 @@ typedef struct FFPlayer {
     int video_extradata_size_guess ;
     int audio_extradata_size_guess ;
     int64_t async_error_code;
+    int use_extradata;
 
     int mediacodec_rotate_degrees;
 
@@ -883,6 +885,7 @@ inline static void ffp_reset_internal(FFPlayer *ffp)
     ffp->audio_extradata_size_guess     = 0;
     ffp->mediacodec_rotate_degrees      = 0;
     ffp->async_error_code = 0;
+    ffp->use_extradata                  = 1;
 
 
     ffp->no_time_adjust                 = 0; // option
