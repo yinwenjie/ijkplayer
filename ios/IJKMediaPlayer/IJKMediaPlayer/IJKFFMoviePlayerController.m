@@ -1012,6 +1012,27 @@ inline static NSString *formatedSpeed(int64_t bytes, int64_t elapsed_milli) {
     return ijkmp_get_property_int64(_mediaPlayer, FFP_PROP_INT64_LOGICAL_FILE_SIZE, 0);
 }
 
+- (int64_t)getHwDecodeErrorCode
+{
+    if (!_mediaPlayer)
+        return 0;
+    return ijkmp_get_property_int64(_mediaPlayer, FFP_PROP_INT64_HW_DECODEC_ERROR_CODE, 0);
+}
+
+- (int64_t)getAsyncInitDecodeErrorCode
+{
+    if (!_mediaPlayer)
+        return 0;
+    return ijkmp_get_property_int64(_mediaPlayer, FFP_PROP_INT64_ASYNC_ERROR_CODE, 0);
+}
+
+- (int64_t)getDemuxErrorCode
+{
+    if (!_mediaPlayer)
+        return 0;
+    return ijkmp_get_property_int64(_mediaPlayer, FFP_PROP_INT64_DEMUX_ERROR_CODE, 0);
+}
+
 - (int64_t)trafficStatistic
 {
     if (!_mediaPlayer)
