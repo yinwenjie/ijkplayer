@@ -3442,6 +3442,11 @@ static int check_streams(FFPlayer *ffp, int streams) {
     int i;
     VideoState *is = ffp->is;
 
+    if (streams != is->ic->nb_streams) {
+        av_log(NULL, AV_LOG_ERROR, "nb_streams mismatch\n");
+        return ASYNC_ERROR_EXTRADATA_DIFFER;
+    }
+
     for (i = 0; i < is->ic->nb_streams; i++) {
         char * old_extradata =  i == is->video_stream ? ffp->video_extradata_guess :
                                    i == is->audio_stream ? ffp->audio_extradata_guess : NULL;
