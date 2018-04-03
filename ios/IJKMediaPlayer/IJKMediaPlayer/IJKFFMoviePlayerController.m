@@ -1619,7 +1619,7 @@ static int ijkff_inject_callback(void *opaque, int message, void *data, size_t d
 }
 
 // NOTE: could be called from multiple thread
-static void ijkff_log_output_callback(void *opaque, int level, const char* fmt, ...)
+static void ijkff_log_output_callback(void *opaque, int level, const char* fmt, va_list ijkap)
 {
     IJKWeakHolder *weakHolder = (__bridge IJKWeakHolder*)opaque;
     IJKFFMoviePlayerController *mpc = weakHolder.object;
@@ -1630,9 +1630,7 @@ static void ijkff_log_output_callback(void *opaque, int level, const char* fmt, 
     if (!delegate)
         return;
 
-    NSString *nsFmt = [NSString stringWithFormat:@"%s", fmt];
-    va_list ijkap;
-    va_start(ijkap, fmt);
+    NSString *nsFmt = [NSString stringWithUTF8String:fmt];
     switch (level) {
         case IJK_LOG_ERROR:
         case IJK_LOG_FATAL:
@@ -1656,7 +1654,6 @@ static void ijkff_log_output_callback(void *opaque, int level, const char* fmt, 
         default:
             break;
     }
-    va_end(ijkap);
 }
 
 #pragma mark Airplay
