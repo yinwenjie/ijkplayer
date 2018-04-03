@@ -315,13 +315,20 @@ IjkMediaMeta *ijkmp_get_meta_l(IjkMediaPlayer *mp)
 void ijkmp_shutdown_l(IjkMediaPlayer *mp)
 {
     assert(mp);
-
+#if defined(__APPLE__)
+    av_log(NULL, AV_LOG_INFO, "ijkmp_shutdown_l()\n");
+#else
     MPTRACE("ijkmp_shutdown_l()\n");
+#endif
     if (mp->ffplayer) {
         ffp_stop_l(mp->ffplayer);
         ffp_wait_stop_l(mp->ffplayer);
     }
+#if defined(__APPLE__)
+    av_log(NULL, AV_LOG_INFO, "ijkmp_shutdown_l()=void\n");
+#else
     MPTRACE("ijkmp_shutdown_l()=void\n");
+#endif
 }
 
 void ijkmp_shutdown(IjkMediaPlayer *mp)
@@ -342,7 +349,11 @@ void ijkmp_dec_ref(IjkMediaPlayer *mp)
 
     int ref_count = __sync_sub_and_fetch(&mp->ref_count, 1);
     if (ref_count == 0) {
+#if defined(__APPLE__)
+        av_log(NULL, AV_LOG_INFO, "ijkmp_dec_ref(): ref=0\n");
+#else
         MPTRACE("ijkmp_dec_ref(): ref=0\n");
+#endif
         ijkmp_shutdown(mp);
         ijkmp_destroy_p(&mp);
     }
@@ -386,11 +397,19 @@ int ijkmp_set_data_source(IjkMediaPlayer *mp, const char *url)
 {
     assert(mp);
     assert(url);
+#if defined(__APPLE__)
+    av_log(NULL, AV_LOG_INFO, "ijkmp_set_data_source(url=\"%s\")\n", url);
+#else
     MPTRACE("ijkmp_set_data_source(url=\"%s\")\n", url);
+#endif
     pthread_mutex_lock(&mp->mutex);
     int retval = ijkmp_set_data_source_l(mp, url);
     pthread_mutex_unlock(&mp->mutex);
+#if defined(__APPLE__)
+    av_log(NULL, AV_LOG_INFO, "ijkmp_set_data_source(url=\"%s\")=%d\n", url, retval);
+#else
     MPTRACE("ijkmp_set_data_source(url=\"%s\")=%d\n", url, retval);
+#endif
     return retval;
 }
 
@@ -440,11 +459,19 @@ static int ijkmp_prepare_async_l(IjkMediaPlayer *mp)
 int ijkmp_prepare_async(IjkMediaPlayer *mp)
 {
     assert(mp);
+#if defined(__APPLE__)
+    av_log(NULL, AV_LOG_INFO, "ijkmp_prepare_async()\n");
+#else
     MPTRACE("ijkmp_prepare_async()\n");
+#endif
     pthread_mutex_lock(&mp->mutex);
     int retval = ijkmp_prepare_async_l(mp);
     pthread_mutex_unlock(&mp->mutex);
+#if defined(__APPLE__)
+    av_log(NULL, AV_LOG_INFO, "ijkmp_prepare_async()\n");
+#else
     MPTRACE("ijkmp_prepare_async()=%d\n", retval);
+#endif
     return retval;
 }
 
@@ -480,11 +507,19 @@ static int ijkmp_start_l(IjkMediaPlayer *mp)
 int ijkmp_start(IjkMediaPlayer *mp)
 {
     assert(mp);
+#if defined(__APPLE__)
+    av_log(NULL, AV_LOG_INFO, "ijkmp_start()\n");
+#else
     MPTRACE("ijkmp_start()\n");
+#endif
     pthread_mutex_lock(&mp->mutex);
     int retval = ijkmp_start_l(mp);
     pthread_mutex_unlock(&mp->mutex);
+#if defined(__APPLE__)
+    av_log(NULL, AV_LOG_INFO, "ijkmp_start()=%d\n", retval);
+#else
     MPTRACE("ijkmp_start()=%d\n", retval);
+#endif
     return retval;
 }
 
@@ -520,11 +555,19 @@ static int ijkmp_pause_l(IjkMediaPlayer *mp)
 int ijkmp_pause(IjkMediaPlayer *mp)
 {
     assert(mp);
+#if defined(__APPLE__)
+    av_log(NULL, AV_LOG_INFO, "ijkmp_pause()\n");
+#else
     MPTRACE("ijkmp_pause()\n");
+#endif
     pthread_mutex_lock(&mp->mutex);
     int retval = ijkmp_pause_l(mp);
     pthread_mutex_unlock(&mp->mutex);
+#if defined(__APPLE__)
+    av_log(NULL, AV_LOG_INFO, "ijkmp_pause()=%d\n", retval);
+#else
     MPTRACE("ijkmp_pause()=%d\n", retval);
+#endif
     return retval;
 }
 
@@ -557,11 +600,19 @@ static int ijkmp_stop_l(IjkMediaPlayer *mp)
 int ijkmp_stop(IjkMediaPlayer *mp)
 {
     assert(mp);
+#if defined(__APPLE__)
+    av_log(NULL, AV_LOG_INFO, "ijkmp_stop()\n");
+#else
     MPTRACE("ijkmp_stop()\n");
+#endif
     pthread_mutex_lock(&mp->mutex);
     int retval = ijkmp_stop_l(mp);
     pthread_mutex_unlock(&mp->mutex);
+#if defined(__APPLE__)
+    av_log(NULL, AV_LOG_INFO, "ijkmp_stop()=%d\n", retval);
+#else
     MPTRACE("ijkmp_stop()=%d\n", retval);
+#endif
     return retval;
 }
 
@@ -610,11 +661,19 @@ int ijkmp_seek_to_l(IjkMediaPlayer *mp, long msec)
 int ijkmp_seek_to(IjkMediaPlayer *mp, long msec)
 {
     assert(mp);
+#if defined(__APPLE__)
+    av_log(NULL, AV_LOG_INFO, "ijkmp_seek_to(%ld)\n", msec);
+#else
     MPTRACE("ijkmp_seek_to(%ld)\n", msec);
+#endif
     pthread_mutex_lock(&mp->mutex);
     int retval = ijkmp_seek_to_l(mp, msec);
     pthread_mutex_unlock(&mp->mutex);
+#if defined(__APPLE__)
+    av_log(NULL, AV_LOG_INFO, "ijkmp_seek_to(%ld)=%d\n", msec, retval);
+#else
     MPTRACE("ijkmp_seek_to(%ld)=%d\n", msec, retval);
+#endif
 
     return retval;
 }
@@ -715,7 +774,11 @@ int ijkmp_get_msg(IjkMediaPlayer *mp, AVMessage *msg, int block)
 
         switch (msg->what) {
         case FFP_MSG_PREPARED:
+#if defined(__APPLE__)
+            av_log(NULL, AV_LOG_INFO, "ijkmp_get_msg: FFP_MSG_PREPARED\n");
+#else
             MPTRACE("ijkmp_get_msg: FFP_MSG_PREPARED\n");
+#endif
             pthread_mutex_lock(&mp->mutex);
             if (mp->mp_state == MP_STATE_ASYNC_PREPARING) {
                 ijkmp_change_state_l(mp, MP_STATE_PREPARED);
@@ -730,7 +793,11 @@ int ijkmp_get_msg(IjkMediaPlayer *mp, AVMessage *msg, int block)
             break;
 
         case FFP_MSG_COMPLETED:
+#if defined(__APPLE__)
+            av_log(NULL, AV_LOG_INFO, "ijkmp_get_msg: FFP_MSG_COMPLETED\n");
+#else
             MPTRACE("ijkmp_get_msg: FFP_MSG_COMPLETED\n");
+#endif
 
             pthread_mutex_lock(&mp->mutex);
             mp->restart = 1;
@@ -740,7 +807,11 @@ int ijkmp_get_msg(IjkMediaPlayer *mp, AVMessage *msg, int block)
             break;
 
         case FFP_MSG_SEEK_COMPLETE:
+#if defined(__APPLE__)
+            av_log(NULL, AV_LOG_INFO, "ijkmp_get_msg: FFP_MSG_SEEK_COMPLETE\n");
+#else
             MPTRACE("ijkmp_get_msg: FFP_MSG_SEEK_COMPLETE\n");
+#endif
 
             pthread_mutex_lock(&mp->mutex);
             mp->seek_req = 0;
@@ -749,7 +820,11 @@ int ijkmp_get_msg(IjkMediaPlayer *mp, AVMessage *msg, int block)
             break;
 
         case FFP_REQ_START:
+#if defined(__APPLE__)
+            av_log(NULL, AV_LOG_INFO, "ijkmp_get_msg: FFP_REQ_START\n");
+#else
             MPTRACE("ijkmp_get_msg: FFP_REQ_START\n");
+#endif
             continue_wait_next_msg = 1;
             pthread_mutex_lock(&mp->mutex);
             if (0 == ikjmp_chkst_start_l(mp->mp_state)) {
@@ -779,7 +854,11 @@ int ijkmp_get_msg(IjkMediaPlayer *mp, AVMessage *msg, int block)
             break;
 
         case FFP_REQ_PAUSE:
+#if defined(__APPLE__)
+            av_log(NULL, AV_LOG_INFO, "ijkmp_get_msg: FFP_REQ_PAUSE\n");
+#else
             MPTRACE("ijkmp_get_msg: FFP_REQ_PAUSE\n");
+#endif
             continue_wait_next_msg = 1;
             pthread_mutex_lock(&mp->mutex);
             if (0 == ikjmp_chkst_pause_l(mp->mp_state)) {
@@ -791,7 +870,11 @@ int ijkmp_get_msg(IjkMediaPlayer *mp, AVMessage *msg, int block)
             break;
 
         case FFP_REQ_SEEK:
+#if defined(__APPLE__)
+            av_log(NULL, AV_LOG_INFO, "ijkmp_get_msg: FFP_REQ_SEEK\n");
+#else
             MPTRACE("ijkmp_get_msg: FFP_REQ_SEEK\n");
+#endif
             continue_wait_next_msg = 1;
 
             pthread_mutex_lock(&mp->mutex);

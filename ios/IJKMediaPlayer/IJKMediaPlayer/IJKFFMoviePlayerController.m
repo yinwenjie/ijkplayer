@@ -1412,7 +1412,9 @@ static int onInjectIOControl(IJKFFMoviePlayerController *mpc, id<IJKMediaUrlOpen
                                 segmentIndex:realData->segment_index
                                 retryCounter:realData->retry_counter];
 
+    av_log(NULL, AV_LOG_INFO, "will call onInjectIOControl type = %d, realData->url = %s, realData->segment_index = %d\n", type, realData->url, realData->segment_index);
     [delegate willOpenUrl:openData];
+    av_log(NULL, AV_LOG_INFO, "did call onInjectIOControl type = %d, realData->url = %s, realData->segment_index = %d\n", type, realData->url, realData->segment_index);
     if (openData.error < 0)
         return -1;
 
@@ -1519,12 +1521,12 @@ static int onInjectOnHttpEvent(IJKFFMoviePlayerController *mpc, int type, void *
             url   = [NSString stringWithUTF8String:realData->url];
             nsurl = [NSURL URLWithString:url];
             host  = nsurl.host;
+            av_log(NULL, AV_LOG_INFO, "AVAPP_EVENT_WILL_HTTP_OPEN url = %s\n", realData->url);
 
             monitor.httpUrl      = url;
             monitor.httpHost     = host;
             monitor.httpOpenTick = SDL_GetTickHR();
             [mpc setHudUrl:url];
-
             if (delegate != nil) {
                 dict[IJKMediaEventAttrKey_host]         = [NSString ijk_stringBeEmptyIfNil:host];
                 dict[IJKMediaEventAttrKey_url]          = [NSString ijk_stringBeEmptyIfNil:monitor.httpUrl];
@@ -1540,6 +1542,7 @@ static int onInjectOnHttpEvent(IJKFFMoviePlayerController *mpc, int type, void *
             monitor.httpOpenTick = 0;
             monitor.lastHttpOpenDuration = elapsed;
             [mpc setHudValue:@(realData->http_code).stringValue forKey:@"http"];
+            av_log(NULL, AV_LOG_INFO, "AVAPP_EVENT_DID_HTTP_OPEN url = %s, httpCode = %d, realData->error = %d\n", realData->url, realData->http_code, realData->error);
 
             if (delegate != nil) {
                 dict[IJKMediaEventAttrKey_time_of_event]    = @(elapsed).stringValue;
@@ -1559,6 +1562,7 @@ static int onInjectOnHttpEvent(IJKFFMoviePlayerController *mpc, int type, void *
                 dict[IJKMediaEventAttrKey_offset]       = @(realData->offset).stringValue;
                 [delegate invoke:type attributes:dict];
             }
+            av_log(NULL, AV_LOG_INFO, "AVAPP_EVENT_WILL_HTTP_SEEK url = %s\n", realData->url);
             break;
         case AVAPP_EVENT_DID_HTTP_SEEK:
             elapsed = calculateElapsed(monitor.httpSeekTick, SDL_GetTickHR());
@@ -1578,6 +1582,7 @@ static int onInjectOnHttpEvent(IJKFFMoviePlayerController *mpc, int type, void *
                 dict[IJKMediaEventAttrKey_http_code]        = @(realData->http_code).stringValue;
                 [delegate invoke:type attributes:dict];
             }
+            av_log(NULL, AV_LOG_INFO, "AVAPP_EVENT_DID_HTTP_SEEK url = %s, httpCode = %d, realData->error = %d\n", realData->url, realData->http_code, realData->error);
             break;
     }
 
@@ -1631,6 +1636,7 @@ static void ijkff_log_output_callback(void *opaque, int level, const char* fmt, 
         return;
 
     NSString *nsFmt = [NSString stringWithUTF8String:fmt];
+
     switch (level) {
         case IJK_LOG_ERROR:
         case IJK_LOG_FATAL:
