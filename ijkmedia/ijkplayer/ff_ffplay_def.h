@@ -440,8 +440,15 @@ typedef struct VideoState {
     SDL_cond  *video_accurate_seek_cond;
     SDL_cond  *audio_accurate_seek_cond;
 
+    /* Only used for async-init-decoder */
     uint32_t async_init_flags;
     volatile int initialized_decoder;
+    AVDictionary *orig_format_opts;
+    AVDictionary *orig_codec_opts;
+    AVDictionary *orig_sws_dict;
+    /*AVDictionary *orig_player_opts;*/
+    AVDictionary *orig_swr_opts;
+    AVDictionary *orig_swr_preset_opts;
     int seek_buffering;
 } VideoState;
 

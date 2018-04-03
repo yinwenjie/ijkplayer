@@ -3671,6 +3671,8 @@ retry_info:
             ((ret               = check_streams(ffp, 2))                        < 0) ||
             ((ret               = check_decoders(ffp))                          < 0) ||
             ((ret               = check_rotate(ffp))                            < 0)) {
+            while(!is->initialized_decoder)
+                SDL_Delay(5);
             av_log(NULL, AV_LOG_ERROR, "rebuild context\n");
             if (is->video_stream >= 0)
                 stream_component_close(ffp, is->video_stream);
@@ -3690,6 +3692,29 @@ retry_info:
             if (find_stream_error < 0) {
                 av_log(NULL, AV_LOG_ERROR, "Find stream info error code = %d\n", find_stream_error);
             }
+            /* restore the opts */
+            av_dict_free(&ffp->format_opts);
+            av_dict_free(&ffp->codec_opts);
+            av_dict_free(&ffp->sws_dict);
+            /*av_dict_free(&ffp->player_opts);*/
+            av_dict_free(&ffp->swr_opts);
+            av_dict_free(&ffp->swr_preset_opts);
+
+            ffp->format_opts        = is->orig_format_opts;
+            ffp->codec_opts         = is->orig_codec_opts;
+            ffp->sws_dict           = is->orig_sws_dict;
+            /*ffp->player_opts        = is->orig_player_opts;*/
+            ffp->swr_opts           = is->orig_swr_opts;
+            ffp->swr_preset_opts    = is->orig_swr_preset_opts;
+
+            is->orig_format_opts        = NULL;
+            is->orig_codec_opts         = NULL;
+            is->orig_sws_dict           = NULL;
+            /*is->orig_opts        = NULL;*/
+            is->orig_swr_opts           = NULL;
+            is->orig_swr_preset_opts    = NULL;
+
+
             goto retry_info;
         }
         ffp_notify_msg1(ffp, FFP_MSG_FIND_STREAM_INFO);
@@ -4393,6 +4418,14 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
         if ((ffp->async_error_code = guess_decoders(ffp)) < 0) {
             av_log(NULL, AV_LOG_ERROR, "Guess decoders fail, error code = %d\n", ffp->async_error_code);
             ffp->async_init_decoder = 0;
+        } else {
+            /* backup opts because function will change them, av_codec_open2, avformat_open_input, .etc.*/
+            av_dict_copy(&is->orig_format_opts, ffp->format_opts, NULL);
+            av_dict_copy(&is->orig_codec_opts, ffp->codec_opts, NULL);
+            av_dict_copy(&is->orig_sws_dict, ffp->sws_dict, NULL);
+            /*av_dict_copy(&is->orig_player_opts, ffp->orig_player_opts, NULL);*/
+            av_dict_copy(&is->orig_swr_opts, ffp->swr_opts, NULL);
+            av_dict_copy(&is->orig_swr_preset_opts, ffp->swr_preset_opts, NULL);
         }
     }
 
