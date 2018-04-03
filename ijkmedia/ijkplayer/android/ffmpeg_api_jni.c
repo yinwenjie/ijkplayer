@@ -86,8 +86,8 @@ FFmpegApi_av_get_resolution(JNIEnv *env, jclass clazz, jstring in)
     int is_avc=0;
     int nal_length_size=0;
     int i;
-    int res[2] = {0};
-    jintArray jres = (*env)->NewIntArray(env, 2);
+    int res[4] = {0};
+    jintArray jres = (*env)->NewIntArray(env, 4);
 
     const char * extradata_enc = (*env)->GetStringUTFChars(env, in, NULL);
 
@@ -119,14 +119,17 @@ FFmpegApi_av_get_resolution(JNIEnv *env, jclass clazz, jstring in)
     if (pps && sps) {
         res[0] = sps->mb_width  * 16 - (sps->crop_right + sps->crop_left);
         res[1] = sps->mb_height * 16 - (sps->crop_top   + sps->crop_bottom);
+        res[2] = sps->sar.num;
+        res[3] = sps->sar.den;
     } else
         goto fail;
 
     av_log(NULL, AV_LOG_INFO, "width = %d, height = %d\n", res[0], res[1]);
+    av_log(NULL, AV_LOG_INFO, "sar = %d/%d\n", res[2], res[3]);
 fail:
     if (extradata)
         av_freep(&extradata);
-    (*env)->SetIntArrayRegion(env, jres, 0, 2, res);
+    (*env)->SetIntArrayRegion(env, jres, 0, 4, res);
     return jres;
 
 }
