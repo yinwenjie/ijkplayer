@@ -96,6 +96,9 @@ typedef enum IJKLogLevel {
 - (float)getVdecFps;
 - (float)getVrenderFps;
 - (int64_t)getTcpSpeed;
+- (int64_t)getHwDecodeErrorCode;
+- (int64_t)getAsyncInitDecodeErrorCode;
+- (int64_t)getDemuxErrorCode;
 
 - (void)setPauseInBackground:(BOOL)pause;
 - (BOOL)isVideoToolboxOpen;
