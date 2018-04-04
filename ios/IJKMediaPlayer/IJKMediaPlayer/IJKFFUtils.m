@@ -66,10 +66,13 @@
     if (pps && sps) {
         res.width = sps->mb_width  * 16 - (sps->crop_right + sps->crop_left);
         res.height = sps->mb_height * 16 - (sps->crop_top   + sps->crop_bottom);
+        res.sar.num = sps->sar.num;
+        res.sar.den = sps->sar.den;
     } else
         goto fail;
     
     av_log(NULL, AV_LOG_DEBUG, "width = %d, height = %d\n", (int)res.width, (int)res.height);
+    av_log(NULL, AV_LOG_DEBUG, "sar = %d/%d\n", (int)res.sar.num, (int)res.sar.den);
     
 fail:
     if (extradata)

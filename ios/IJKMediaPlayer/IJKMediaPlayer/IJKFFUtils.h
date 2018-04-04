@@ -22,13 +22,18 @@
  */
 #import <Foundation/Foundation.h>
 
+typedef struct IJKFFRational {
+    NSInteger num;
+    NSInteger den;
+} IJKFFRational;
+
 typedef struct IJKFFResolution {
     NSInteger width;
     NSInteger height;
+    IJKFFRational sar;
 } IJKFFResolution;
 
 @interface IJKFFUtils : NSObject
 
 +(IJKFFResolution)getResolutionByExtradata:(NSString *) extradata_base64;
-
 @end
