@@ -1764,7 +1764,7 @@ int ffpipenode_config_from_android_mediacodec(FFPlayer *ffp, IJKFF_Pipeline *pip
         goto fail;
     }
 
-    if (!node || node->opaque) {
+    if (!node || !node->opaque) {
         goto fail;
     } else {
         opaque = node->opaque;
