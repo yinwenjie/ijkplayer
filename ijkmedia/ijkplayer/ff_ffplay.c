@@ -3220,7 +3220,9 @@ static int decoder_open(FFPlayer *ffp, AVCodecContext ** pavctx)
         if (ffp->node_vdec) {
             is->viddec.avctx = avctx;
             ret = ffpipeline_config_video_decoder(ffp->pipeline, ffp);
-        } else {
+        }
+
+        if (ret || !ffp->node_vdec) {
             decoder_init(&is->viddec, avctx, &is->videoq, is->continue_read_thread);
             is->viddec.queue_bak = &is->videoq_bak;
             ffp->node_vdec = ffpipeline_open_video_decoder(ffp->pipeline, ffp);
@@ -4452,7 +4454,7 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
 
     if (ffp->async_init_decoder && ffp->use_extradata) {
         if ((ffp->async_error_code = guess_decoders(ffp)) < 0) {
-            av_log(NULL, AV_LOG_ERROR, "Guess decoders fail, error code = %d\n", ffp->async_error_code);
+            av_log(NULL, AV_LOG_ERROR, "Guess decoders fail, error code = %lld\n", ffp->async_error_code);
             ffp->use_extradata      = 0;
         } else {
             /* backup opts because function will change them, av_codec_open2, avformat_open_input, .etc.*/

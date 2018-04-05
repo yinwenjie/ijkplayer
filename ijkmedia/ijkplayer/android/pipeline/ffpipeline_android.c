@@ -109,7 +109,7 @@ static int func_config_video_decoder(IJKFF_Pipeline *pipeline, FFPlayer *ffp)
     int                       ret = NULL;
 
     if (ffp->node_vdec) {
-        ret = ffpipenode_config_from_android_mediacodec(ffp, pipeline, opaque->weak_vout, ffp->node_vdec);
+        ret = ffpipenode_config_from_android_mediacodec(ffp, pipeline, opaque->weak_vout, &ffp->node_vdec);
     }
 
     return ret;

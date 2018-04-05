@@ -57,6 +57,7 @@
 #define MEDIACODEC_OUTPUT_ERROR -1
 #define MEDIACODEC_INPUT_ERROR -2
 #define MEDIACODEC_CREATE_ERROR -3
+#define MEDIACODEC_ASYNC_CONFIG_ERROR -4
 
 typedef struct AMC_Buf_Out {
     int port;
@@ -1750,17 +1751,24 @@ static int func_flush(IJKFF_Pipenode *node)
     return 0;
 }
 
-int ffpipenode_config_from_android_mediacodec(FFPlayer *ffp, IJKFF_Pipeline *pipeline, SDL_Vout *vout, IJKFF_Pipenode *node) {
+int ffpipenode_config_from_android_mediacodec(FFPlayer *ffp, IJKFF_Pipeline *pipeline, SDL_Vout *vout, IJKFF_Pipenode **p_node) {
     int                   ret     = 0;
     VideoState            *is     = ffp->is;
-    IJKFF_Pipenode_Opaque *opaque = node->opaque;
+    IJKFF_Pipenode        *node   = *p_node;
+    IJKFF_Pipenode_Opaque *opaque = NULL;
     JNIEnv                *env    = NULL;
     jobject              jsurface = NULL;
-    opaque->decoder               = &is->viddec;
 
     if (JNI_OK != SDL_JNI_SetupThreadEnv(&env)) {
         ALOGE("%s:create: SetupThreadEnv failed\n", __func__);
         goto fail;
+    }
+
+    if (!node || node->opaque) {
+        goto fail;
+    } else {
+        opaque = node->opaque;
+        opaque->decoder = &is->viddec;
     }
 
     ret = avcodec_parameters_from_context(opaque->codecpar, opaque->decoder->avctx);
@@ -1894,8 +1902,8 @@ int ffpipenode_config_from_android_mediacodec(FFPlayer *ffp, IJKFF_Pipeline *pip
 
 fail:
     ret = -1;
-    ffp->hw_decode_error_code = MEDIACODEC_CREATE_ERROR;
-    ffpipenode_free_p(&node);
+    ffp->hw_decode_error_code = MEDIACODEC_ASYNC_CONFIG_ERROR;
+    ffpipenode_free_p(p_node);
     return ret;
 }
 
