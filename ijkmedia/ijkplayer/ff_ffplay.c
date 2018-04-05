@@ -3619,7 +3619,7 @@ retry_info:
     if (err < 0) {
         print_error(is->filename, err);
         ret = -1;
-        if (ffp->async_init_decoder && ffp->use_extradata) {
+        if (ffp->async_init_decoder) {
             while (!is->initialized_decoder)
                 SDL_Delay(5);
         }
