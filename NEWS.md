@@ -1,5 +1,24 @@
 tag next
 --------------------------------
+
+tag k0.8.11
+--------------------------------
+- ffmpeg: quick parse mp4
+- ffmpeg: fix hls issue
+- android: mediacodec fallback
+- ios: support log output
+- ijkplay: support set video rate
+- ijkplay: support async init hw codec
+
+tag k0.8.10
+--------------------------------
+- ios: add monitor api
+
+tag k0.8.9
+--------------------------------
+- ffmpeg: add ijk protocol
+- ijkplay: fix some bug about frame output
+
 tag k0.8.8
 --------------------------------
 - ffmpeg: upgrade to 3.4
