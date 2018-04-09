@@ -885,7 +885,7 @@ inline static void ffp_reset_internal(FFPlayer *ffp)
     ffp->audio_extradata_size_guess     = 0;
     ffp->mediacodec_rotate_degrees      = 0;
     ffp->async_error_code = 0;
-    ffp->use_extradata                  = 1;
+    ffp->use_extradata                  = 0;
 
 
     ffp->no_time_adjust                 = 0; // option
