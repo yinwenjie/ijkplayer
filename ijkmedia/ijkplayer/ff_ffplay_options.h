@@ -218,7 +218,7 @@ static const AVOption ffp_context_options[] = {
     { "audio-extradata",          "base64 endcoded extradata for audio",
         OPTION_OFFSET(audio_extradata),      OPTION_STR(NULL) },
     { "use-extradata",          "Use extradata for async-init-decoder",
-        OPTION_OFFSET(use_extradata),      OPTION_INT(1, 0, 1)},
+        OPTION_OFFSET(use_extradata),      OPTION_INT(0, 0, 1)},
 
     { NULL }
 };

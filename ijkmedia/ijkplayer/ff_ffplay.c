@@ -3226,8 +3226,10 @@ static int decoder_open(FFPlayer *ffp, AVCodecContext ** pavctx)
             decoder_init(&is->viddec, avctx, &is->videoq, is->continue_read_thread);
             is->viddec.queue_bak = &is->videoq_bak;
             ffp->node_vdec = ffpipeline_open_video_decoder(ffp->pipeline, ffp);
-            if (!ffp->node_vdec)
+            if (!ffp->node_vdec) {
+                ret = -1;
                 goto fail;
+            }
         }
         packet_queue_start(&is->videoq_bak);
 
@@ -3739,6 +3741,13 @@ retry_info:
             is->orig_swr_opts           = NULL;
             is->orig_swr_preset_opts    = NULL;
 
+            completed = 0;
+            pkt_in_play_range = 0;
+            scan_all_pmts_set = 0;
+            last_error = 0;
+            prev_io_tick_counter = 0;
+            io_tick_counter = 0;
+            init_ijkmeta = 0;
 
             goto retry_info;
         }
