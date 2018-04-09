@@ -1443,6 +1443,10 @@ static int drain_output_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs
     IJKFF_Pipenode_Opaque *opaque = node->opaque;
     SDL_LockMutex(opaque->acodec_mutex);
 
+    if (!opaque->acodec) {
+        return -1;
+    }
+
     if (opaque->acodec_flush_request || opaque->acodec_reconfigure_request) {
         // TODO: invalid picture here?
         // let feed_input_buffer() get mutex
@@ -1708,7 +1712,9 @@ fail:
     av_frame_free(&frame);
     opaque->abort = true;
     SDL_WaitThread(opaque->enqueue_thread, NULL);
-    SDL_AMediaCodecFake_abort(opaque->acodec);
+    if (opaque->acodec) {
+        SDL_AMediaCodecFake_abort(opaque->acodec);
+    }
     if (opaque->n_buf_out) {
         free(opaque->amc_buf_out);
         opaque->n_buf_out = 0;
@@ -1718,11 +1724,9 @@ fail:
     }
     if (opaque->acodec) {
         SDL_VoutAndroid_invalidateAllBuffers(opaque->weak_vout);
-        SDL_LockMutex(opaque->acodec_mutex);
-        SDL_UnlockMutex(opaque->acodec_mutex);
+        SDL_AMediaCodec_stop(opaque->acodec);
+        SDL_AMediaCodec_decreaseReferenceP(&opaque->acodec);
     }
-    SDL_AMediaCodec_stop(opaque->acodec);
-    SDL_AMediaCodec_decreaseReferenceP(&opaque->acodec);
     if (ret == AMEDIACODEC__UNKNOWN_ERROR && !opaque->acodec_decodec_succeed && ffp->hw_decode_fallback_enable) {
         ALOGW("%s MediaCodec:AMEDIACODEC__UNKNOWN_ERROR error will try fallback to ffplay decoder", __func__);
         av_packet_unref(&d->pkt);
