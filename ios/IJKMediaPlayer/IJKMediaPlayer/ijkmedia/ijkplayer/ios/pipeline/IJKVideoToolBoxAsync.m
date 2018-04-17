@@ -752,6 +752,7 @@ static inline void ResetPktBuffer(Ijk_VideoToolBox_Opaque* context) {
 static inline void DuplicatePkt(Ijk_VideoToolBox_Opaque* context, const AVPacket* pkt) {
     if (context->m_buffer_deep >= MAX_PKT_QUEUE_DEEP) {
         context->idr_based_identified = false;
+        av_log(NULL, AV_LOG_ERROR, "m_buffer overflow\n");
         ResetPktBuffer(context);
     }
     AVPacket* avpkt = &context->m_buffer_packet[context->m_buffer_deep];
@@ -766,7 +767,7 @@ static int decode_video(Ijk_VideoToolBox_Opaque* context, AVCodecContext *avctx,
     int      ret            = 0;
     uint8_t *size_data      = NULL;
     int      size_data_size = 0;
-
+    bool     isAnnexB = context->ffp->isAnnexB;
     if (!avpkt || !avpkt->data) {
         return 0;
     }
@@ -815,10 +816,10 @@ static int decode_video(Ijk_VideoToolBox_Opaque* context, AVCodecContext *avctx,
             avcodec_free_context(&new_avctx);
         }
     } else {
-        if (ff_avpacket_is_idr(avpkt) == true) {
+        if (ff_avpacket_is_idr(avpkt, isAnnexB) == true) {
             context->idr_based_identified = true;
         }
-        if (ff_avpacket_i_or_idr(avpkt, context->idr_based_identified) == true) {
+        if (ff_avpacket_i_or_idr(avpkt, context->idr_based_identified, isAnnexB) == true) {
             ResetPktBuffer(context);
             context->recovery_drop_packet = false;
         }
@@ -831,7 +832,8 @@ static int decode_video(Ijk_VideoToolBox_Opaque* context, AVCodecContext *avctx,
 
     if (context->refresh_session) {
         ret = 0;
-
+        int64_t refresh_start;
+        av_log(NULL, AV_LOG_ERROR, "refresh session at %lld us\n", refresh_start = av_gettime());
         sample_info_flush(context, 1000);
         vtbsession_destroy(context);
         memset(context->sample_info_array, 0, sizeof(context->sample_info_array));
@@ -840,12 +842,13 @@ static int decode_video(Ijk_VideoToolBox_Opaque* context, AVCodecContext *avctx,
         context->vt_session = vtbsession_create(context);
         if (!context->vt_session)
             return -1;
-
+        av_log(NULL, AV_LOG_ERROR, "recreate session end, duration =  %lld us\n", av_gettime() - refresh_start);
         if ((context->m_buffer_deep > 0) &&
-            ff_avpacket_i_or_idr(&context->m_buffer_packet[0], context->idr_based_identified) == true ) {
+            ff_avpacket_i_or_idr(&context->m_buffer_packet[0], context->idr_based_identified, isAnnexB) == true ) {
             for (int i = 0; i < context->m_buffer_deep; i++) {
                 AVPacket* pkt = &context->m_buffer_packet[i];
                 ret = decode_video_internal(context, avctx, pkt, got_picture_ptr);
+                av_log(NULL, AV_LOG_ERROR, "recovery success!!!!\n");
             }
         } else {
             context->recovery_drop_packet = true;
@@ -853,6 +856,7 @@ static int decode_video(Ijk_VideoToolBox_Opaque* context, AVCodecContext *avctx,
             av_log(NULL, AV_LOG_ERROR, "recovery error!!!!\n");
         }
         context->refresh_session = false;
+        av_log(NULL, AV_LOG_ERROR, "refresh session end, duration =  %lld us\n", av_gettime() - refresh_start);
         return ret;
     }
     return decode_video_internal(context, avctx, avpkt, got_picture_ptr);

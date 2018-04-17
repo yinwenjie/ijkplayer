@@ -771,6 +771,7 @@ typedef struct FFPlayer {
     int hw_decode_fallback_enable;
     int hw_decode_error_code;
     int max_cache_time;
+    int isAnnexB;
 } FFPlayer;
 
 #define fftime_to_milliseconds(ts) (av_rescale(ts, 1000, AV_TIME_BASE))
