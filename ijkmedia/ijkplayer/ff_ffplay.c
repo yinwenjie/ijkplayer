@@ -3609,6 +3609,15 @@ retry_info:
         av_dict_set_int(&ffp->format_opts, "skip-calc-frame-rate", ffp->skip_calc_frame_rate, 0);
     }
 
+#ifdef __APPLE__
+    if ((t = av_dict_get(ffp->format_opts, "hls_io_protocol_enable", NULL, AV_DICT_MATCH_CASE))) {
+        if (!strcmp(t->value, "1")) {
+            ffp->isAnnexB = 1;
+            av_log(NULL, AV_LOG_INFO, "use annex b for ts IDR\n");
+        }
+    }
+#endif
+
     // Disable bitstream filter for time saving
     if (ffp->async_init_decoder && ffp->use_extradata) {
         av_dict_set_int(&ffp->format_opts, "nb-streams",   2, 0);

@@ -291,27 +291,6 @@ static uint32_t bytesToInt(uint8_t* src) {
     return value;
 }
 
-
-
-static bool ff_avpacket_is_idr(const AVPacket* pkt) {
-
-    int state = -1;
-
-    if (pkt->data && pkt->size >= 5) {
-        int offset = 0;
-        while (offset >= 0 && offset + 5 <= pkt->size) {
-            void* nal_start = pkt->data+offset;
-            state = ff_get_nal_units_type(nal_start);
-            if (state == NAL_IDR_SLICE) {
-                return true;
-            }
-            //            ALOGI("offset %d \n", bytesToInt(nal_start));
-            offset+=(bytesToInt(nal_start) + 4);
-        }
-    }
-    return false;
-}
-
 static bool ff_avpacket_is_key(const AVPacket* pkt) {
     if (pkt->flags & AV_PKT_FLAG_KEY) {
         return true;
@@ -320,9 +299,46 @@ static bool ff_avpacket_is_key(const AVPacket* pkt) {
     }
 }
 
-static bool ff_avpacket_i_or_idr(const AVPacket* pkt,bool isIdr) {
+static bool ff_avpacket_is_idr(const AVPacket* pkt, int isAnnexb) {
+
+    int state = -1;
+
+    if (!ff_avpacket_is_key(pkt))
+        return  false;
+
+    if (!isAnnexb) {
+        if (pkt->data && pkt->size >= 5) {
+            int offset = 0;
+            while (offset >= 0 && offset + 5 <= pkt->size) {
+                void* nal_start = pkt->data+offset;
+                state = ff_get_nal_units_type(nal_start);
+                if (state == NAL_IDR_SLICE) {
+                    return true;
+                }
+                //ALOGI("offset %d \n", bytesToInt(nal_start));
+                offset+=(bytesToInt(nal_start) + 4);
+            }
+        }
+    } else {
+        if (pkt->data && pkt->size >= 4) {
+            uint8_t * cur = pkt->data + 2;
+            while (cur < pkt->data + pkt->size - 1) {
+                // (0x00) 0x00 0x00 0x01 0x65 for IDR
+                if ((*cur++ != 0x01) || *(cur - 2) || *(cur - 3) || ((*cur & 0x1f) != NAL_IDR_SLICE))
+                    continue;
+                av_log(NULL, AV_LOG_DEBUG, "Found IDR Packet\n");
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+
+
+static bool ff_avpacket_i_or_idr(const AVPacket* pkt,bool isIdr, bool isAnnexB) {
     if (isIdr == true) {
-        return ff_avpacket_is_idr(pkt);
+        return ff_avpacket_is_idr(pkt, isAnnexB);
     } else {
         return ff_avpacket_is_key(pkt);
     }
