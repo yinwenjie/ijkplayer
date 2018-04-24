@@ -3339,6 +3339,7 @@ static AVCodecContext * create_video_decoder_by_extradata (FFPlayer *ffp, char *
         avctx->height = sps->mb_height * 16 - (sps->crop_top   + sps->crop_bottom);
         avctx->profile = sps->profile_idc;
         avctx->level   = sps->level_idc;
+        avctx->sample_aspect_ratio = sps->sar;
     } else
         return NULL;
 
@@ -3763,12 +3764,16 @@ retry_info:
         ffp_notify_msg1(ffp, FFP_MSG_FIND_STREAM_INFO);
         av_log(NULL, AV_LOG_INFO, "nb_streams = %d\n", ic->nb_streams);
     }
-
-    for (i = 0; i < is->ic->nb_streams; i++) {
-        AVCodecParameters *codecpar = is->ic->streams[i]->codecpar;
-        if (codecpar && codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-            ffp_notify_msg3(ffp, FFP_MSG_VIDEO_SIZE_CHANGED, codecpar->width, codecpar->height);
-            ffp_notify_msg3(ffp, FFP_MSG_SAR_CHANGED, codecpar->sample_aspect_ratio.num, codecpar->sample_aspect_ratio.den);
+    if (ffp->async_init_decoder && ffp->use_extradata && is->viddec.avctx) {
+       ffp_notify_msg3(ffp, FFP_MSG_VIDEO_SIZE_CHANGED, is->viddec.avctx->width, is->viddec.avctx->height);
+       ffp_notify_msg3(ffp, FFP_MSG_SAR_CHANGED, is->viddec.avctx->sample_aspect_ratio.num, is->viddec.avctx->sample_aspect_ratio.den);
+    } else {
+        for (i = 0; i < is->ic->nb_streams; i++) {
+           AVCodecParameters *codecpar = is->ic->streams[i]->codecpar;
+           if (codecpar && codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+               ffp_notify_msg3(ffp, FFP_MSG_VIDEO_SIZE_CHANGED, codecpar->width, codecpar->height);
+               ffp_notify_msg3(ffp, FFP_MSG_SAR_CHANGED, codecpar->sample_aspect_ratio.num, codecpar->sample_aspect_ratio.den);
+           }
         }
     }
 
