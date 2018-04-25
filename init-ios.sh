@@ -56,13 +56,18 @@ function pull_common() {
 
     echo "== pull ffmpeg base =="
     sh $TOOLS/pull-repo-base.sh $IJK_FFMPEG_UPSTREAM $IJK_FFMPEG_LOCAL_REPO
+    cd $IJK_FFMPEG_LOCAL_REPO
+    git fetch origin
+    git checkout -b $IJK_FFMPEG_COMMIT origin/$IJK_FFMPEG_COMMIT
+    cd -
 }
 
 function pull_fork() {
     echo "== pull ffmpeg fork $1 =="
     sh $TOOLS/pull-repo-ref.sh $IJK_FFMPEG_FORK ios/ffmpeg-$1 ${IJK_FFMPEG_LOCAL_REPO}
     cd ios/ffmpeg-$1
-    git checkout ${IJK_FFMPEG_COMMIT} -B ijkplayer
+    git fetch origin
+    git checkout -b $IJK_FFMPEG_COMMIT origin/$IJK_FFMPEG_COMMIT
     cd -
 }
 
