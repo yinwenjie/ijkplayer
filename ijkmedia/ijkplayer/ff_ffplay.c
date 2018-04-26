@@ -3710,10 +3710,13 @@ retry_info:
             while(!is->initialized_decoder)
                 SDL_Delay(5);
             av_log(NULL, AV_LOG_ERROR, "rebuild context\n");
-            if (is->video_stream >= 0)
+
+            if (is->video_stream >= 0 && !(is->async_init_flags & ASYNC_INIT_VCODEC_FAIL))
                 stream_component_close(ffp, is->video_stream);
-            if (is->audio_stream >= 0)
+
+            if (is->audio_stream >= 0 && !(is->async_init_flags & ASYNC_INIT_ACODEC_FAIL))
                 stream_component_close(ffp, is->audio_stream);
+
             av_dict_set_int(&ffp->format_opts, "auto_convert", 1, 0);
             av_dict_set_int(&ffp->format_opts, "nb-streams", 0, 0);
             if (ic)
