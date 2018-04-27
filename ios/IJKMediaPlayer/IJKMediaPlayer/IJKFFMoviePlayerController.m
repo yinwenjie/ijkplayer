@@ -1839,9 +1839,16 @@ static void ijkff_log_output_callback(void *opaque, int level, const char* fmt, 
         }
         case AVAudioSessionInterruptionTypeEnded: {
             NSLog(@"IJKFFMoviePlayerController:audioSessionInterrupt: end\n");
-            [[IJKAudioKit sharedInstance] setActive:YES];
-            if (_playingBeforeInterruption) {
-                [self play];
+            int optionsValue = [[[notification userInfo] valueForKey:AVAudioSessionInterruptionOptionKey] intValue];
+            if (optionsValue == AVAudioSessionInterruptionOptionShouldResume) {
+                NSLog(@"IJKFFMoviePlayerController:audioSessionInterrupt: end and play\n");
+                [[IJKAudioKit sharedInstance] setActive:YES];
+                if (_playingBeforeInterruption) {
+                    [self play];
+                }
+            } else {
+                [[IJKAudioKit sharedInstance] setActive:YES];
+                NSLog(@"IJKFFMoviePlayerController:audioSessionInterrupt: end but no play\n");
             }
             break;
         }
