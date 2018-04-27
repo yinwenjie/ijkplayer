@@ -29,8 +29,8 @@
 
 typedef struct SPSContext {
     int buffer_index;
-    int total_bytes;
-    uint8_t * buffer;
+    size_t total_bytes;
+    const uint8_t * buffer;
     uint32_t current_word;
     int current_word_bits_left;
     int pic_width_in_mbs_minus1;
@@ -48,7 +48,7 @@ typedef struct SPSContext {
 } SPSContext;
 
 static void fillCurrentWord(SPSContext *ctx) {
-    int buffer_bytes_left = ctx->total_bytes - ctx->buffer_index;
+    int buffer_bytes_left = (int)ctx->total_bytes - ctx->buffer_index;
     if (ctx->error < 0)
         return;
 
@@ -297,14 +297,26 @@ IJKFFResolution parseSPS(SPSContext *ctx) {
     return  sps;
 }
 
+
 +(IJKFFResolution) getResolutionByExtradata:(NSString *) extradata_base64
 {
     SPSContext ctx = {0};
+    IJKFFResolution res = {0};
+
+    if (!extradata_base64)
+        return res;
     NSData *data = [[NSData alloc] initWithBase64EncodedString:extradata_base64
                                                        options:NSDataBase64DecodingIgnoreUnknownCharacters];
+    if (!data)
+        return res;
 
     ctx.buffer =  [data bytes];
     ctx.total_bytes = [data length];
-    return parseSPS(&ctx);
+
+    if (!ctx.total_bytes || !ctx.buffer)
+        return  res;
+
+    res = parseSPS(&ctx);
+    return res;
 }
 @end
