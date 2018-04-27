@@ -243,7 +243,7 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
         [self setHudValue:nil forKey:@"t-preroll"];
         [self setHudValue:nil forKey:@"t-http-open"];
         [self setHudValue:nil forKey:@"t-http-seek"];
-        
+
         self.shouldShowHudView = options.showHudView;
 
         ijkmp_ios_set_glview(_mediaPlayer, _glView);
@@ -287,11 +287,20 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
                                withGLView:glView];
 }
 
+- (void)setGlViewProtocol:(UIView<IJKSDLGLViewProtocol> *)glView
+{
+    if (glView != nil) {
+        glView.isThirdGLView = YES;
+    }
+    _view = _glView = (IJKSDLGLView *)glView;
+    ijkmp_ios_set_glview(_mediaPlayer, _glView);
+}
+
 - (id)initWithMoreContentString:(NSString *)aUrlString
                  withOptions:(IJKFFOptions *)options
                   withGLView:(UIView <IJKSDLGLViewProtocol> *)glView
 {
-    if (aUrlString == nil || glView == nil)
+    if (aUrlString == nil)
         return nil;
 
     self = [super init];
@@ -333,29 +342,15 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
         ijkmp_set_option_int(_mediaPlayer, IJKMP_OPT_CATEGORY_PLAYER, "start-on-prepared", _shouldAutoplay ? 1 : 0);
 
         self.shouldShowHudView = options.showHudView;
-        glView.isThirdGLView = YES;
-        _view = _glView = (IJKSDLGLView *)glView;
         _hudViewController = [[IJKSDLHudViewController alloc] init];
-        [_hudViewController setRect:_glView.frame];
         _shouldShowHudView = NO;
         _hudViewController.tableView.hidden = YES;
-        [_view addSubview:_hudViewController.tableView];
 
-        [self setHudValue:nil forKey:@"scheme"];
-        [self setHudValue:nil forKey:@"host"];
-        [self setHudValue:nil forKey:@"path"];
-        [self setHudValue:nil forKey:@"ip"];
-        [self setHudValue:nil forKey:@"tcp-info"];
-        [self setHudValue:nil forKey:@"http"];
-        [self setHudValue:nil forKey:@"tcp-spd"];
-        [self setHudValue:nil forKey:@"t-prepared"];
-        [self setHudValue:nil forKey:@"t-render"];
-        [self setHudValue:nil forKey:@"t-preroll"];
-        [self setHudValue:nil forKey:@"t-http-open"];
-        [self setHudValue:nil forKey:@"t-http-seek"];
-        self.shouldShowHudView = options.showHudView;
-
-        ijkmp_ios_set_glview(_mediaPlayer, _glView);
+        if (glView != nil) {
+            glView.isThirdGLView = YES;
+            _view = _glView = (IJKSDLGLView *)glView;
+            ijkmp_ios_set_glview(_mediaPlayer, _glView);
+        }
 
         ijkmp_set_option(_mediaPlayer, IJKMP_OPT_CATEGORY_PLAYER, "overlay-format", "fcc-_es2");
 #ifdef DEBUG
@@ -742,6 +737,9 @@ inline static int getPlayerOption(IJKFFOptionCategory category)
 - (void)setScalingMode: (IJKMPMovieScalingMode) aScalingMode
 {
     IJKMPMovieScalingMode newScalingMode = aScalingMode;
+    if (_view == nil)
+        return;
+
     switch (aScalingMode) {
         case IJKMPMovieScalingModeNone:
             [_view setContentMode:UIViewContentModeCenter];
@@ -770,6 +768,9 @@ inline static int getPlayerOption(IJKFFOptionCategory category)
 
 - (UIImage *)thumbnailImageAtCurrentTime
 {
+    if (_view == nil)
+        return nil;
+
     if ([_view conformsToProtocol:@protocol(IJKSDLGLViewProtocol)]) {
         id<IJKSDLGLViewProtocol> glView = (id<IJKSDLGLViewProtocol>)_view;
         return [glView snapshot];

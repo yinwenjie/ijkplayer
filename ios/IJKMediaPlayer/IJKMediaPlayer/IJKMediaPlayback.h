@@ -23,6 +23,7 @@
 
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
+#import "IJKSDLGLViewProtocol.h"
 
 typedef NS_ENUM(NSInteger, IJKMPMovieScalingMode) {
     IJKMPMovieScalingModeNone,       // No scaling
@@ -67,6 +68,7 @@ typedef NS_ENUM(NSInteger, IJKMPMovieTimeOption) {
 
 @protocol IJKMediaPlayback <NSObject>
 
+- (void)setGlViewProtocol:(UIView<IJKSDLGLViewProtocol> *)glView;
 - (void)prepareToPlay;
 - (void)play;
 - (void)pause;
