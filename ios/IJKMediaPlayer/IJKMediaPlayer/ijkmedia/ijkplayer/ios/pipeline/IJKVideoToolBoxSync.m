@@ -877,11 +877,11 @@ int videotoolbox_sync_decode_frame(Ijk_VideoToolBox_Opaque* context)
     VideoState *is = ffp->is;
     Decoder *d = &is->viddec;
     int got_frame = 0;
+    int ret = VIDEOTOOLBOX_UNKNOWN_ERROR;
     do {
-        int ret = -1;
         if (is->abort_request || d->queue->abort_request ||  context->abort) {
             ffp->hw_decode_error_code = context->hw_decode_error_code;
-            return -1;
+            return ret;
         }
 
         if (!d->packet_pending || d->queue->serial != d->pkt_serial) {
@@ -892,7 +892,7 @@ int videotoolbox_sync_decode_frame(Ijk_VideoToolBox_Opaque* context)
                 ffp_video_statistic_l(ffp);
                 if (ffp_packet_queue_get_or_buffering(ffp, d->queue, &pkt, &d->pkt_serial, &d->finished) < 0) {
                     ffp->hw_decode_error_code = context->hw_decode_error_code;
-                    return -1;
+                    return VIDEOTOOLBOX_UNKNOWN_ERROR;
                 }
                 if (ffp_is_flush_packet(&pkt)) {
                     avcodec_flush_buffers(d->avctx);
