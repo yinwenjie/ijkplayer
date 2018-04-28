@@ -30,6 +30,11 @@
 #include "ijksdl_vout_ios_gles2.h"
 #import <UIKit/UIKit.h>
 
+#define VIDEOTOOLBOX_UNKNOWN_ERROR  -1
+#define VIDEOTOOLBOX_RECOVERY_ERROR -2
+#define VIDEOTOOLBOX_RECOVERY_FAIL -3
+#define VIDEOTOOLBOX_DECODEC_ERROR -4
+
 struct IJKFF_Pipenode_Opaque {
     IJKFF_Pipeline           *pipeline;
     FFPlayer                 *ffp;
@@ -65,7 +70,7 @@ int videotoolbox_video_thread(void *arg)
             goto the_end;
     }
 the_end:
-    return 0;
+    return ret;
 }
 
 
@@ -84,6 +89,12 @@ static int func_run_sync(IJKFF_Pipenode *node)
         opaque->context->free(opaque->context->opaque);
         free(opaque->context);
         opaque->context = NULL;
+    }
+
+    if (ret == VIDEOTOOLBOX_DECODEC_ERROR && opaque->ffp->hw_decode_error_code && opaque->ffp->hw_decode_fallback_enable) {
+        ALOGE("%s VideoToolBox:  error will try fallback to ffplay decoder ,hw_decode_error_code = %d\n",
+              __func__, opaque->ffp->hw_decode_error_code);
+        ffp_video_thread(opaque->ffp);
     }
 
     return ret;
