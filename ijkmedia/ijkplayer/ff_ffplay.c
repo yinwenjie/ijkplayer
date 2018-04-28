@@ -947,6 +947,7 @@ static void video_image_display2(FFPlayer *ffp)
                 ffp->first_video_frame_rendered = 1;
                 ffp_notify_msg1(ffp, FFP_MSG_VIDEO_RENDERING_START);
             }
+            is->audclk.paused = is->vidclk.paused = is->extclk.paused = is->pause_req;
             while (is->pause_req && !is->abort_request) {
                 SDL_Delay(20);
             }
@@ -2817,6 +2818,7 @@ static void sdl_audio_callback(void *opaque, Uint8 *stream, int len)
     }
 
     if (ffp->render_wait_start && !ffp->start_on_prepared && is->pause_req) {
+        is->audclk.paused = is->vidclk.paused = is->extclk.paused = is->pause_req;
         while (is->pause_req && !is->abort_request) {
             SDL_Delay(20);
         }
