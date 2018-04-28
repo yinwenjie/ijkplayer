@@ -25,6 +25,11 @@
 
 #include "ijkplayer/ff_ffpipeline.h"
 
+#define VIDEOTOOLBOX_UNKNOWN_ERROR  -1
+#define VIDEOTOOLBOX_RECOVERY_ERROR -2
+#define VIDEOTOOLBOX_RECOVERY_FAIL -3
+#define VIDEOTOOLBOX_DECODEC_ERROR -4
+
 struct FFPlayer;
 
 IJKFF_Pipeline *ffpipeline_create_from_ios(struct FFPlayer *ffp);
