@@ -253,8 +253,8 @@ IJKFFResolution parseSPS(SPSContext *ctx) {
             ctx->aspect_ratio = readBits(ctx, 8);
             printf("sar_idc = %d\n", ctx->aspect_ratio);
             if (ctx->aspect_ratio == 255) {
-                ctx->sar_width = readBits(ctx, 16);
-                ctx->sar_height = readBits(ctx, 16);
+                ctx->sar_width =  ntohs((uint16_t)readBits(ctx, 16));
+                ctx->sar_height = ntohs((uint16_t)readBits(ctx, 16));
             }
         }
     } else {
