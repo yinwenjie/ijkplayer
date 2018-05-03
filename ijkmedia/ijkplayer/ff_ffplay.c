@@ -2819,6 +2819,7 @@ static void sdl_audio_callback(void *opaque, Uint8 *stream, int len)
 
     if (ffp->render_wait_start && !ffp->start_on_prepared && is->pause_req) {
         is->audclk.paused = is->vidclk.paused = is->extclk.paused = is->pause_req;
+        SDL_AoutPauseAudio(ffp->aout, 1);
         while (is->pause_req && !is->abort_request) {
             SDL_Delay(20);
         }
