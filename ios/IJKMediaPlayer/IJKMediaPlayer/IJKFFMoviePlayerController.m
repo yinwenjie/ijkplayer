@@ -252,7 +252,7 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
         [IJKFFMoviePlayerController setLogLevel:k_IJK_LOG_DEBUG];
 #else
         if ([options isLogOutput]) {
-            [IJKFFMoviePlayerController setLogLevel:k_IJK_LOG_DEBUG];
+            [IJKFFMoviePlayerController setLogLevel:k_IJK_LOG_INFO];
         } else {
             [IJKFFMoviePlayerController setLogLevel:k_IJK_LOG_SILENT];
         }
@@ -356,7 +356,11 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
 #ifdef DEBUG
         [IJKFFMoviePlayerController setLogLevel:k_IJK_LOG_DEBUG];
 #else
-        [IJKFFMoviePlayerController setLogLevel:k_IJK_LOG_SILENT];
+        if ([options isLogOutput]) {
+            [IJKFFMoviePlayerController setLogLevel:k_IJK_LOG_INFO];
+        } else {
+            [IJKFFMoviePlayerController setLogLevel:k_IJK_LOG_SILENT];
+        }
 #endif
         // init audio sink
         [[IJKAudioKit sharedInstance] setupAudioSession];
