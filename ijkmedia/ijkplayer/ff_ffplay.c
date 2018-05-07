@@ -1379,7 +1379,7 @@ retry:
             if (lastvp->serial != vp->serial)
                 is->frame_timer = av_gettime_relative() / 1000000.0;
 
-            if (is->paused)
+            if (is->paused && !(ffp->render_wait_start && !ffp->first_video_frame_rendered))
                 goto display;
 
             /* compute nominal last_duration */
@@ -4581,7 +4581,7 @@ static int video_refresh_thread(void *arg)
         if (remaining_time > 0.0)
             av_usleep((int)(int64_t)(remaining_time * 1000000.0));
         remaining_time = REFRESH_RATE;
-        if (is->show_mode != SHOW_MODE_NONE && (!is->paused || is->force_refresh))
+        if (is->show_mode != SHOW_MODE_NONE && (!is->paused || is->force_refresh || (ffp->render_wait_start && !ffp->first_video_frame_rendered)))
             video_refresh(ffp, &remaining_time);
     }
 
