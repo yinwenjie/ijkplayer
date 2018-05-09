@@ -72,10 +72,10 @@ static void fillCurrentWord(SPSContext *ctx) {
     }
 }
 
-static int skipLeadingZero(SPSContext *ctx) {
+static int skipLeadingZero(SPSContext *ctx, int dep) {
     int i;
 
-    if (ctx->error < 0)
+    if (ctx->error < 0 || dep > 8)
         return -1;
     for (i = 0; i < ctx->current_word_bits_left; i++) {
         if ((ctx->current_word & (0x80000000 >> i)) != 0) {
@@ -87,7 +87,7 @@ static int skipLeadingZero(SPSContext *ctx) {
 
     fillCurrentWord(ctx);
 
-    return  skipLeadingZero(ctx) + i;
+    return  skipLeadingZero(ctx, dep + 1) + i;
 }
 
 static int readBits(SPSContext *ctx, int bits) {
@@ -128,7 +128,7 @@ static int readUEG(SPSContext *ctx) {
     if (ctx->error < 0)
         return -1;
 
-    return readBits(ctx, skipLeadingZero(ctx) + 1) - 1;
+    return readBits(ctx, skipLeadingZero(ctx, 0) + 1) - 1;
 }
 
 
