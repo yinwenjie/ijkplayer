@@ -93,7 +93,6 @@ public class SPSParser {
         }
 
         int bytes_read = Math.min(4, buffer_bytes_left);
-
         try {
             if (bytes_read == 4) {
                 current_word = buffer.readInt();
@@ -125,9 +124,11 @@ public class SPSParser {
             last_scale = (next_scale == 0) ? last_scale : next_scale;
         }
     }
-    private  int skipLeadingZero() {
+    private  int skipLeadingZero(int dep) {
         int i;
-
+        //Limit max number
+        if (dep > 8)
+            return 0;
         for (i = 0; i < current_word_bits_left; i++) {
             if ((current_word & (0x80000000 >>> i)) != 0) {
                 current_word <<= i;
@@ -138,7 +139,7 @@ public class SPSParser {
 
         fillCurrentWord();
 
-        return  skipLeadingZero() + i;
+        return  skipLeadingZero(dep + 1) + i;
     }
     private  int readBits(int bits) {
         if (bits <= current_word_bits_left) {
@@ -171,7 +172,7 @@ public class SPSParser {
 
 
     private int readUEG() {
-        return readBits(skipLeadingZero() + 1) - 1;
+        return readBits(skipLeadingZero(0) + 1) - 1;
     }
 
 
