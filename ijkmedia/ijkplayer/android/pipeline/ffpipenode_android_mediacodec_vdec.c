@@ -830,8 +830,10 @@ static int feed_input_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, 
                     avcodec_free_context(&new_avctx);
                     return change_ret;
                 } else {
-                    if (opaque->codecpar->width  != new_avctx->width &&
-                        opaque->codecpar->height != new_avctx->height) {
+                    if (opaque->codecpar->width  != new_avctx->width ||
+                        opaque->codecpar->height != new_avctx->height ||
+                        opaque->codecpar->profile != new_avctx->profile ||
+                        opaque->codecpar->level != new_avctx->level) {
                         ALOGW("AV_PKT_DATA_NEW_EXTRADATA: %d x %d\n", new_avctx->width, new_avctx->height);
                         avcodec_parameters_from_context(opaque->codecpar, new_avctx);
                         opaque->aformat_need_recreate = true;
