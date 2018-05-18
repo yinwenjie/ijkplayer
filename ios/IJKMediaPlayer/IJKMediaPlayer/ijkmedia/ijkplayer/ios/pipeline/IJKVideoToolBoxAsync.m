@@ -844,8 +844,10 @@ static int decode_video(Ijk_VideoToolBox_Opaque* context, AVCodecContext *avctx,
                 avcodec_free_context(&new_avctx);
                 return ret;
             } else {
-                if (context->codecpar->width  != new_avctx->width &&
-                    context->codecpar->height != new_avctx->height) {
+                if (context->codecpar->width  != new_avctx->width ||
+                    context->codecpar->height != new_avctx->height ||
+                    context->codecpar->profile != new_avctx->profile ||
+                    context->codecpar->level != new_avctx->level) {
                     avcodec_parameters_from_context(context->codecpar, new_avctx);
                     context->refresh_request = true;
                 }
