@@ -1661,8 +1661,12 @@ static int queue_picture(FFPlayer *ffp, AVFrame *src_frame, double pts, double d
         vp->height != src_frame->height ||
         vp->format != src_frame->format) {
 
-        if (vp->width != src_frame->width || vp->height != src_frame->height)
+        if (vp->width != src_frame->width || vp->height != src_frame->height) {
+            while (frame_queue_nb_remaining(&is->pictq) > 0 && !is->abort_request) {
+                SDL_Delay(10);
+            }
             ffp_notify_msg3(ffp, FFP_MSG_VIDEO_SIZE_CHANGED, src_frame->width, src_frame->height);
+        }
 
         vp->allocated = 0;
         vp->width = src_frame->width;
