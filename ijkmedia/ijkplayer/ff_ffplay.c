@@ -4128,7 +4128,9 @@ retry_info:
 #endif
             || (   stream_has_enough_packets(is->audio_st, is->audio_stream, &is->audioq, MIN_FRAMES)
                 && stream_has_enough_packets(is->video_st, is->video_stream, &is->videoq, MIN_FRAMES)
-                && stream_has_enough_packets(is->subtitle_st, is->subtitle_stream, &is->subtitleq, MIN_FRAMES)))) {
+                && stream_has_enough_packets(is->subtitle_st, is->subtitle_stream, &is->subtitleq, MIN_FRAMES))
+            || ((!is->video_st || ffp->stat.video_cache.duration > ffp->max_cache_time)
+                && (!is->audio_st || ffp->stat.audio_cache.duration > ffp->max_cache_time)))) {
             if (!is->eof) {
                 ffp_toggle_buffering(ffp, 0);
             }
