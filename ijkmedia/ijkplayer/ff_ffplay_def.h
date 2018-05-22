@@ -154,9 +154,9 @@ static unsigned sws_flags = SWS_BICUBIC;
 
 #define UNKNOWN_FINISH -10001
 
-#define DEFAULT_CACHE_TIME  20   // 20ms
-#define MIN_CACHE_TIME      1
-#define MAX_CACHE_TIME      180
+#define DEFAULT_CACHE_TIME  15000   // 15s
+#define MIN_CACHE_TIME      1000
+#define MAX_CACHE_TIME      180000
 
 enum FrameOutputTaskStatus {
     TASK_IDLE = -1, TASK_WAIT_TODO = 0, TASK_DOING = 1
