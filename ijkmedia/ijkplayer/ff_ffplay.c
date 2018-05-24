@@ -336,9 +336,13 @@ static int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block, int *seria
 
 static int packet_queue_get_or_buffering(FFPlayer *ffp, PacketQueue *q, AVPacket *pkt, int *serial, int *finished)
 {
+    int ret = 0;
     assert(finished);
-    if (!ffp->packet_buffering)
-        return packet_queue_get(q, pkt, 1, serial);
+    if (!ffp->packet_buffering) {
+        ret = packet_queue_get(q, pkt, 1, serial);
+        ffp_statistic_l(ffp);
+        return ret;
+    }
 
     while (1) {
         int new_packet = packet_queue_get(q, pkt, 0, serial);
@@ -371,6 +375,7 @@ static int packet_queue_get_or_buffering(FFPlayer *ffp, PacketQueue *q, AVPacket
         else
             break;
     }
+    ffp_statistic_l(ffp);
 
     return 1;
 }
@@ -958,10 +963,10 @@ static void video_image_display2(FFPlayer *ffp)
             if (!ffp->first_video_frame_rendered) {
                 ffp->first_video_frame_rendered = 1;
                 ffp_notify_msg1(ffp, FFP_MSG_VIDEO_RENDERING_START);
-            }
-            is->audclk.paused = is->vidclk.paused = is->extclk.paused = is->pause_req;
-            while (is->pause_req && !is->abort_request) {
-                SDL_Delay(20);
+                is->audclk.paused = is->vidclk.paused = is->extclk.paused = is->pause_req;
+                while (is->pause_req && !is->abort_request) {
+                    SDL_Delay(20);
+                }
             }
         }
         SDL_VoutDisplayYUVOverlay(ffp->vout, vp->bmp);
@@ -2820,6 +2825,13 @@ static void sdl_audio_callback(void *opaque, Uint8 *stream, int len)
     if (!ffp->first_audio_frame_rendered) {
         ffp->first_audio_frame_rendered = 1;
         ffp_notify_msg1(ffp, FFP_MSG_AUDIO_RENDERING_START);
+        if (ffp->render_wait_start && !ffp->start_on_prepared && is->pause_req) {
+            is->audclk.paused = is->vidclk.paused = is->extclk.paused = is->pause_req;
+            SDL_AoutPauseAudio(ffp->aout, 1);
+            while (is->pause_req && !is->abort_request) {
+                SDL_Delay(20);
+            }
+        }
     }
 
     if (is->latest_audio_seek_load_serial == is->audio_clock_serial) {
@@ -2830,14 +2842,6 @@ static void sdl_audio_callback(void *opaque, Uint8 *stream, int len)
             } else {
                 ffp_notify_msg2(ffp, FFP_MSG_AUDIO_SEEK_RENDERING_START, 0);
             }
-        }
-    }
-
-    if (ffp->render_wait_start && !ffp->start_on_prepared && is->pause_req) {
-        is->audclk.paused = is->vidclk.paused = is->extclk.paused = is->pause_req;
-        SDL_AoutPauseAudio(ffp->aout, 1);
-        while (is->pause_req && !is->abort_request) {
-            SDL_Delay(20);
         }
     }
 }
@@ -4074,6 +4078,8 @@ retry_info:
                 } else {
                    set_clock(&is->extclk, seek_target / (double)AV_TIME_BASE, 0);
                 }
+
+                ffp_statistic_l(ffp);
 
                 is->latest_video_seek_load_serial = is->videoq.serial;
                 is->latest_audio_seek_load_serial = is->audioq.serial;
