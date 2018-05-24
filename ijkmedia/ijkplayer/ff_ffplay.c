@@ -345,8 +345,20 @@ static int packet_queue_get_or_buffering(FFPlayer *ffp, PacketQueue *q, AVPacket
         if (new_packet < 0)
             return -1;
         else if (new_packet == 0) {
-            if (q->is_buffer_indicator && !*finished)
+            if (q->is_buffer_indicator && !*finished) {
+                if ((ffp->first_video_frame_rendered || !ffp->is->video_st) && (ffp->first_audio_frame_rendered || !ffp->is->audio_st)) {
+                    if (ffp->water_mark_array[ffp->water_mark_index] <= ffp->dcc.last_high_water_mark_in_ms) {
+                        ffp->dcc.current_high_water_mark_in_ms = ffp->water_mark_array[ffp->water_mark_index];
+                    } else {
+                        ffp->dcc.current_high_water_mark_in_ms = ffp->dcc.last_high_water_mark_in_ms;
+                    }
+                    ffp->water_mark_index++;
+                    if (ffp->water_mark_array[ffp->water_mark_index] <= 0) {
+                        ffp->water_mark_index--;
+                    }
+                }
                 ffp_toggle_buffering(ffp, 1);
+            }
             new_packet = packet_queue_get(q, pkt, 1, serial);
             if (new_packet < 0)
                 return -1;
@@ -4397,6 +4409,45 @@ static int guess_decoders(FFPlayer *ffp) {
     return ret;
 }
 
+static void init_buffering_water_mark_array(FFPlayer *ffp) {
+    char *water_mark_string = NULL;
+    int water_mark_string_len = 0;
+    if (ffp->buffering_water_mark_string) {
+        water_mark_string_len = strlen(ffp->buffering_water_mark_string);
+    }
+    if (water_mark_string_len > 0) {
+        water_mark_string = (char *)calloc(water_mark_string_len + 1, sizeof(char));
+        strcpy(water_mark_string, ffp->buffering_water_mark_string);
+        char *p = strtok(water_mark_string,",");
+        int value_len = strlen(p);
+
+        if (water_mark_string_len != value_len) {
+            int index = 0;
+            while(p && (index < WATER_MARK_ARRAY_SIZE))
+            {
+                if (p) {
+                    ffp->water_mark_array[index] = atoi(p);
+                    av_log(NULL, AV_LOG_INFO, "ffp->water_mark_array[%d] = %d\n", index, ffp->water_mark_array[index]);
+                }
+                p = strtok(NULL,",");
+                index++;
+            }
+        }
+        if (ffp->water_mark_array[0] > 0) {
+            return;
+        }
+    }
+
+    memset(ffp->water_mark_array, WATER_MARK_ARRAY_SIZE, 0);
+    if (WATER_MARK_ARRAY_SIZE > 5) {
+        ffp->water_mark_array[0] = 500;
+        ffp->water_mark_array[1] = 1000;
+        ffp->water_mark_array[2] = 2000;
+        ffp->water_mark_array[3] = 4000;
+        ffp->water_mark_array[4] = 5000;
+    }
+}
+
 static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputFormat *iformat)
 {
     assert(!ffp->is);
@@ -4416,6 +4467,8 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
         is->handle = ijk_soundtouch_create();
     }
 #endif
+
+    init_buffering_water_mark_array(ffp);
 
     /* start video display */
     if (frame_queue_init(&is->pictq, &is->videoq, ffp->pictq_size, 1) < 0)
@@ -5625,17 +5678,6 @@ void ffp_check_buffering_l(FFPlayer *ffp)
     }
 
     if (need_start_buffering) {
-        if (hwm_in_ms < ffp->dcc.next_high_water_mark_in_ms) {
-            hwm_in_ms = ffp->dcc.next_high_water_mark_in_ms;
-        } else {
-            hwm_in_ms *= 2;
-        }
-
-        if (hwm_in_ms > ffp->dcc.last_high_water_mark_in_ms)
-            hwm_in_ms = ffp->dcc.last_high_water_mark_in_ms;
-
-        ffp->dcc.current_high_water_mark_in_ms = hwm_in_ms;
-
         if (is->buffer_indicator_queue && is->buffer_indicator_queue->nb_packets > 0) {
             if (   (is->audioq.nb_packets >= MIN_MIN_FRAMES || is->audio_stream < 0 || is->audioq.abort_request)
                 && (is->videoq.nb_packets >= MIN_MIN_FRAMES || is->video_stream < 0 || is->videoq.abort_request)) {

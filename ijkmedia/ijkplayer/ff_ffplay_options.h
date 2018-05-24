@@ -168,6 +168,8 @@ static const AVOption ffp_context_options[] = {
         OPTION_OFFSET(hw_decode_fallback_enable),      OPTION_INT(0, 0, 1) },
     { "max-cache-time",                         "max cache time",
         OPTION_OFFSET(max_cache_time),      OPTION_INT(DEFAULT_CACHE_TIME, MIN_CACHE_TIME, MAX_CACHE_TIME) },
+    { "buffering-water-mark-string",                    "buffering water mark",
+        OPTION_OFFSET(buffering_water_mark_string),     OPTION_STR(NULL) },
 
         // iOS only options
     { "videotoolbox",                       "VideoToolbox: enable",

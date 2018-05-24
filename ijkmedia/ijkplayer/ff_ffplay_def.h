@@ -74,8 +74,8 @@
  * MAX:   ...
  */
 #define DEFAULT_FIRST_HIGH_WATER_MARK_IN_MS     (100)
-#define DEFAULT_NEXT_HIGH_WATER_MARK_IN_MS      (1 * 1000)
-#define DEFAULT_LAST_HIGH_WATER_MARK_IN_MS      (5 * 1000)
+#define DEFAULT_NEXT_HIGH_WATER_MARK_IN_MS      (500)
+#define DEFAULT_LAST_HIGH_WATER_MARK_IN_MS      (8 * 1000)
 
 #define BUFFERING_CHECK_PER_BYTES               (512)
 #define BUFFERING_CHECK_PER_MILLISECONDS        (500)
@@ -157,6 +157,7 @@ static unsigned sws_flags = SWS_BICUBIC;
 #define DEFAULT_CACHE_TIME  15000   // 15s
 #define MIN_CACHE_TIME      1000
 #define MAX_CACHE_TIME      180000
+#define WATER_MARK_ARRAY_SIZE 50  // min 5
 
 enum FrameOutputTaskStatus {
     TASK_IDLE = -1, TASK_WAIT_TODO = 0, TASK_DOING = 1
@@ -773,6 +774,9 @@ typedef struct FFPlayer {
     int hw_decode_error_code;
     int max_cache_time;
     int isAnnexB;
+    char *buffering_water_mark_string;
+    int water_mark_index;
+    int water_mark_array[WATER_MARK_ARRAY_SIZE];
 } FFPlayer;
 
 #define fftime_to_milliseconds(ts) (av_rescale(ts, 1000, AV_TIME_BASE))
@@ -900,6 +904,7 @@ inline static void ffp_reset_internal(FFPlayer *ffp)
     ffp->hw_decode_fallback_enable      = 0;
     ffp->hw_decode_error_code           = 0;
     ffp->max_cache_time                 = 0;
+    ffp->buffering_water_mark_string    = NULL;
 
     ijkmeta_reset(ffp->meta);
 
