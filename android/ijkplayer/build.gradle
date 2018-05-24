@@ -33,7 +33,7 @@ ext {
 
     targetSdkVersion = 25
 
-    versionCode = 801202
+    versionCode = 801401
     versionName = "0.8.12.2-service"
 }
 
