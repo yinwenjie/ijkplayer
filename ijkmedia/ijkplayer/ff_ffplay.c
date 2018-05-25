@@ -4419,13 +4419,13 @@ static void init_buffering_water_mark_array(FFPlayer *ffp) {
     char *water_mark_string = NULL;
     int water_mark_string_len = 0;
     if (ffp->buffering_water_mark_string) {
-        water_mark_string_len = strlen(ffp->buffering_water_mark_string);
+        water_mark_string_len = (int)strlen(ffp->buffering_water_mark_string);
     }
     if (water_mark_string_len > 0) {
         water_mark_string = (char *)calloc(water_mark_string_len + 1, sizeof(char));
         strcpy(water_mark_string, ffp->buffering_water_mark_string);
         char *p = strtok(water_mark_string,",");
-        int value_len = strlen(p);
+        int value_len = (int)strlen(p);
 
         if (water_mark_string_len != value_len) {
             int index = 0;
