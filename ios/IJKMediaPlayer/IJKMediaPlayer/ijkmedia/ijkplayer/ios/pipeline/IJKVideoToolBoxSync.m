@@ -683,6 +683,19 @@ static int decode_video(Ijk_VideoToolBox_Opaque* context, AVCodecContext *avctx,
         return 0;
     }
 
+    if (ff_avpacket_is_idr(avpkt, isAnnexB) == true) {
+        context->idr_based_identified = true;
+    }
+    if (ff_avpacket_i_or_idr(avpkt, context->idr_based_identified, isAnnexB) == true) {
+        ResetPktBuffer(context);
+        context->recovery_drop_packet = false;
+    }
+    if (context->recovery_drop_packet == true) {
+        return -1;
+    }
+
+    DuplicatePkt(context, avpkt);
+
     if (context->ffp->vtb_handle_resolution_change &&
         context->codecpar->codec_id == AV_CODEC_ID_H264) {
         size_data = av_packet_get_side_data(avpkt, AV_PKT_DATA_NEW_EXTRADATA, &size_data_size);
@@ -728,20 +741,7 @@ static int decode_video(Ijk_VideoToolBox_Opaque* context, AVCodecContext *avctx,
             av_frame_unref(frame);
             avcodec_free_context(&new_avctx);
         }
-    } else {
-        if (ff_avpacket_is_idr(avpkt, isAnnexB) == true) {
-            context->idr_based_identified = true;
-        }
-        if (ff_avpacket_i_or_idr(avpkt, context->idr_based_identified, isAnnexB) == true) {
-            ResetPktBuffer(context);
-            context->recovery_drop_packet = false;
-        }
-        if (context->recovery_drop_packet == true) {
-            return -1;
-        }
     }
-
-    DuplicatePkt(context, avpkt);
 
     if (context->refresh_session) {
         ret = 0;
