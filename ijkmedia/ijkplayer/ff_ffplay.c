@@ -4537,6 +4537,10 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
     ffp->is = is;
     is->pause_req = !ffp->start_on_prepared;
 
+    if (ffp->seek_at_start > 0) {
+        ffp->async_init_decoder = 0;
+        ffp->use_extradata = 0;
+    }
 
     if (ffp->async_init_decoder && ffp->use_extradata) {
         if ((ffp->async_error_code = guess_decoders(ffp)) < 0) {
