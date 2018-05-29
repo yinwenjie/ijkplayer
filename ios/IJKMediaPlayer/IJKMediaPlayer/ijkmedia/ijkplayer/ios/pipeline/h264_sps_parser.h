@@ -285,6 +285,10 @@ static inline int ff_get_nal_units_type(const uint8_t * const data) {
     return   data[4] & 0x1f;
 }
 
+static inline int ff_get_hevc_nal_units_type(const uint8_t * const data) {
+    return  (data[4] & 0x7E) / 2;
+}
+
 static uint32_t bytesToInt(uint8_t* src) {
     uint32_t value;
     value = (uint32_t)((src[0] & 0xFF)<<24|(src[1]&0xFF)<<16|(src[2]&0xFF)<<8|(src[3]&0xFF));
@@ -299,7 +303,7 @@ static bool ff_avpacket_is_key(const AVPacket* pkt) {
     }
 }
 
-static bool ff_avpacket_is_idr(const AVPacket* pkt, int isAnnexb) {
+static bool ff_avpacket_is_idr(const AVPacket* pkt, int isAnnexb, bool is_hevc) {
 
     int state = -1;
 
@@ -311,9 +315,16 @@ static bool ff_avpacket_is_idr(const AVPacket* pkt, int isAnnexb) {
             int offset = 0;
             while (offset >= 0 && offset + 5 <= pkt->size) {
                 void* nal_start = pkt->data+offset;
-                state = ff_get_nal_units_type(nal_start);
-                if (state == NAL_IDR_SLICE) {
-                    return true;
+                if (is_hevc) {
+                    state = ff_get_hevc_nal_units_type(nal_start);
+                    if (state == 19 || state == 20) {
+                        return true;
+                    }
+                } else {
+                    state = ff_get_nal_units_type(nal_start);
+                    if (state == NAL_IDR_SLICE) {
+                        return true;
+                    }
                 }
                 //ALOGI("offset %d \n", bytesToInt(nal_start));
                 offset+=(bytesToInt(nal_start) + 4);
@@ -336,9 +347,9 @@ static bool ff_avpacket_is_idr(const AVPacket* pkt, int isAnnexb) {
 
 
 
-static bool ff_avpacket_i_or_idr(const AVPacket* pkt,bool isIdr, bool isAnnexB) {
+static bool ff_avpacket_i_or_idr(const AVPacket* pkt,bool isIdr, bool isAnnexB, bool is_hevc) {
     if (isIdr == true) {
-        return ff_avpacket_is_idr(pkt, isAnnexB);
+        return ff_avpacket_is_idr(pkt, isAnnexB, is_hevc);
     } else {
         return ff_avpacket_is_key(pkt);
     }

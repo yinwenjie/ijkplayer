@@ -108,6 +108,7 @@ struct Ijk_VideoToolBox_Opaque {
     volatile bool               abort;
     volatile bool               vtb_decodec_succeed;
     volatile bool               enable_hw_queue_bak;
+    volatile bool               is_hevc;
 };
 
 
@@ -545,6 +546,12 @@ static VTDecompressionSessionRef vtbsession_create(Ijk_VideoToolBox_Opaque* cont
     VTDecompressionOutputCallbackRecord outputCallback;
     OSStatus status;
 
+    if (context->codecpar->codec_id == AV_CODEC_ID_HEVC) {
+        context->is_hevc = true;
+    } else {
+        context->is_hevc = false;
+    }
+
     ret = vtbformat_init(&context->fmt_desc, context->codecpar);
 
     if (ffp->vtb_max_frame_width > 0 && width > ffp->vtb_max_frame_width) {
@@ -811,10 +818,10 @@ static int decode_video(Ijk_VideoToolBox_Opaque* context, AVCodecContext *avctx,
         return 0;
     }
 
-    if (ff_avpacket_is_idr(avpkt, isAnnexB) == true) {
+    if (ff_avpacket_is_idr(avpkt, isAnnexB, context->is_hevc) == true) {
         context->idr_based_identified = true;
     }
-    if (ff_avpacket_i_or_idr(avpkt, context->idr_based_identified, isAnnexB) == true) {
+    if (ff_avpacket_i_or_idr(avpkt, context->idr_based_identified, isAnnexB, context->is_hevc) == true) {
         ResetPktBuffer(context);
         context->recovery_drop_packet = false;
     }
@@ -886,7 +893,7 @@ static int decode_video(Ijk_VideoToolBox_Opaque* context, AVCodecContext *avctx,
         }
 
         if ((context->m_buffer_deep > 0) &&
-            ff_avpacket_i_or_idr(&context->m_buffer_packet[0], context->idr_based_identified, isAnnexB) == true ) {
+           ff_avpacket_i_or_idr(&context->m_buffer_packet[0], context->idr_based_identified, isAnnexB, context->is_hevc) == true ) {
             for (int i = 0; i < context->m_buffer_deep; i++) {
                 AVPacket* pkt = &context->m_buffer_packet[i];
                 ret = decode_video_internal(context, avctx, pkt, got_picture_ptr);
@@ -1244,6 +1251,12 @@ Ijk_VideoToolBox_Opaque* videotoolbox_async_create(FFPlayer* ffp, AVCodecContext
 
     context_vtb->ffp = ffp;
     context_vtb->idr_based_identified = true;
+
+    if (context_vtb->codecpar->codec_id == AV_CODEC_ID_HEVC) {
+        context_vtb->is_hevc = true;
+    } else {
+        context_vtb->is_hevc = false;
+    }
 
     ret = vtbformat_init(&context_vtb->fmt_desc, context_vtb->codecpar);
     if (ret)
