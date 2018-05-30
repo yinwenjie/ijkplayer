@@ -1,6 +1,12 @@
 tag next
 --------------------------------
 
+tag k0.8.15
+--------------------------------
+- ijkplayer: support ios resolution change
+- ijkplayer: buffering_water_mark option
+- ijkplayer: support ios hevc
+
 tag k0.8.14
 --------------------------------
 - ijkplayer: delete bitrate cache
