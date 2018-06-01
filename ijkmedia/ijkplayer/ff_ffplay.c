@@ -969,6 +969,13 @@ static void video_image_display2(FFPlayer *ffp)
                 }
             }
         }
+
+        if (vp->width != is->cur_video_width || vp->height != is->cur_video_height) {
+            ffp_notify_msg3(ffp, FFP_MSG_VIDEO_SIZE_CHANGED, vp->width, vp->height);
+            is->cur_video_width = vp->width;
+            is->cur_video_height = vp->height;
+        }
+
         SDL_VoutDisplayYUVOverlay(ffp->vout, vp->bmp);
         ffp->stat.vfps = SDL_SpeedSamplerAdd(&ffp->vfps_sampler, FFP_SHOW_VFPS_FFPLAY, "vfps[ffplay]");
         if (!ffp->first_video_frame_rendered) {
@@ -1677,13 +1684,6 @@ static int queue_picture(FFPlayer *ffp, AVFrame *src_frame, double pts, double d
         vp->width  != src_frame->width ||
         vp->height != src_frame->height ||
         vp->format != src_frame->format) {
-
-        if (vp->width != src_frame->width || vp->height != src_frame->height) {
-            while (frame_queue_nb_remaining(&is->pictq) > 0 && !is->abort_request) {
-                SDL_Delay(10);
-            }
-            ffp_notify_msg3(ffp, FFP_MSG_VIDEO_SIZE_CHANGED, src_frame->width, src_frame->height);
-        }
 
         vp->allocated = 0;
         vp->width = src_frame->width;
