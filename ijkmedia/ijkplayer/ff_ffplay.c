@@ -139,12 +139,6 @@ int64_t get_valid_channel_layout(int64_t channel_layout, int channels)
 }
 #endif
 
-/* return the number of undisplayed frames in the queue */
-static int frame_queue_nb_remaining(FrameQueue *f)
-{
-    return f->size - f->rindex_shown;
-}
-
 static void free_picture(Frame *vp);
 
 static int packet_queue_put_private(PacketQueue *q, AVPacket *pkt)
@@ -343,7 +337,6 @@ static int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block, int *seria
 static int packet_queue_get_or_buffering(FFPlayer *ffp, PacketQueue *q, AVPacket *pkt, int *serial, int *finished)
 {
     int ret = 0;
-    VideoState *is = ffp->is;
     assert(finished);
     if (!ffp->packet_buffering) {
         ret = packet_queue_get(q, pkt, 1, serial);
@@ -367,9 +360,6 @@ static int packet_queue_get_or_buffering(FFPlayer *ffp, PacketQueue *q, AVPacket
                     if (ffp->water_mark_array[ffp->water_mark_index] <= 0) {
                         ffp->water_mark_index--;
                     }
-                }
-                while (frame_queue_nb_remaining(&is->pictq) > 0 && !is->abort_request) {
-                    SDL_Delay(10);
                 }
                 ffp_toggle_buffering(ffp, 1);
             }
@@ -845,6 +835,12 @@ static void frame_queue_next(FrameQueue *f)
     f->size--;
     SDL_CondSignal(f->cond);
     SDL_UnlockMutex(f->mutex);
+}
+
+/* return the number of undisplayed frames in the queue */
+static int frame_queue_nb_remaining(FrameQueue *f)
+{
+    return f->size - f->rindex_shown;
 }
 
 /* return last shown position */
