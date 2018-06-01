@@ -453,6 +453,8 @@ typedef struct VideoState {
     AVDictionary *orig_swr_opts;
     AVDictionary *orig_swr_preset_opts;
     int seek_buffering;
+    int cur_video_width;
+    int cur_video_height;
 } VideoState;
 
 /* options specified by the user */
