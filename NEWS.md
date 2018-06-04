@@ -1,6 +1,10 @@
 tag next
 --------------------------------
 
+tag k0.8.16
+--------------------------------
+- ijkplayer: fix resolution change change issue
+
 tag k0.8.15
 --------------------------------
 - ijkplayer: support ios resolution change
