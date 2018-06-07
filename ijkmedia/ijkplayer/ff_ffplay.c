@@ -4254,34 +4254,6 @@ retry_info:
         }
 
         if (ffp->async_init_decoder && ffp->use_extradata) {
-            int64_t video_start_time = av_rescale_q(ic->streams[is->video_stream]->start_time,
-                                                    ic->streams[is->video_stream]->time_base,
-                                                    AV_TIME_BASE_Q);
-
-            int64_t audio_start_time = av_rescale_q(ic->streams[is->audio_stream]->start_time,
-                                                    ic->streams[is->audio_stream]->time_base,
-                                                    AV_TIME_BASE_Q);
-
-            if (video_start_time != AV_NOPTS_VALUE && audio_start_time != AV_NOPTS_VALUE) {
-                int diff = 1;
-                if (ic->start_time == AV_NOPTS_VALUE) {
-                    ic->start_time = video_start_time < audio_start_time ? video_start_time : audio_start_time;
-                } else if(ic->start_time > video_start_time){
-                    ic->start_time = video_start_time;
-                } else if(ic->start_time > audio_start_time){
-                    ic->start_time = audio_start_time;
-                } else {
-                    diff = 0;
-                }
-
-                if (diff) {
-                    av_log(NULL, AV_LOG_INFO, "start time differ\n");
-                    if(ffp->show_status)
-                        av_dump_format(ic, 0, is->filename, 0);
-                }
-            }
-
-
             if (is->ic->iformat && !strcmp(is->ic->iformat->name, "flv")) {
                 FLVContext * flv = ic->priv_data;
                 if (flv && (flv->video_bit_rate != ic->streams[is->video_stream]->codecpar->bit_rate ||
@@ -4536,11 +4508,6 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
     }
     ffp->is = is;
     is->pause_req = !ffp->start_on_prepared;
-
-    if (ffp->seek_at_start > 0) {
-        ffp->async_init_decoder = 0;
-        ffp->use_extradata = 0;
-    }
 
     if (ffp->async_init_decoder && ffp->use_extradata) {
         if ((ffp->async_error_code = guess_decoders(ffp)) < 0) {
