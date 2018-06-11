@@ -61,6 +61,8 @@ typedef NS_ENUM(NSInteger, IJKSDLGLViewApplicationState) {
     BOOL            _didLockedDueToMovedToWindow;
     BOOL            _shouldLockWhileBeingMovedToWindow;
     NSMutableArray *_registeredNotifications;
+    UIScreen        *_targetScreen;
+    CAEAGLLayer     *_targetLayer;
 }
 
 @synthesize isThirdGLView              = _isThirdGLView;
@@ -147,18 +149,12 @@ typedef NS_ENUM(NSInteger, IJKSDLGLViewApplicationState) {
     if (_didSetupGL)
         return YES;
 
-    CAEAGLLayer *eaglLayer = (CAEAGLLayer*) self.layer;
-    eaglLayer.opaque = YES;
-    eaglLayer.drawableProperties = [NSDictionary dictionaryWithObjectsAndKeys:
+    _targetLayer = (CAEAGLLayer*) self.layer;
+    _targetLayer.opaque = YES;
+    _targetLayer.drawableProperties = [NSDictionary dictionaryWithObjectsAndKeys:
                                     [NSNumber numberWithBool:NO], kEAGLDrawablePropertyRetainedBacking,
                                     kEAGLColorFormatRGBA8, kEAGLDrawablePropertyColorFormat,
                                     nil];
-
-    _scaleFactor = [[UIScreen mainScreen] scale];
-    if (_scaleFactor < 0.1f)
-        _scaleFactor = 1.0f;
-
-    [eaglLayer setContentsScale:_scaleFactor];
 
     _context = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
     if (_context == nil) {
@@ -242,15 +238,27 @@ typedef NS_ENUM(NSInteger, IJKSDLGLViewApplicationState) {
 
 - (void)setScaleFactor:(CGFloat)scaleFactor
 {
-    _scaleFactor = scaleFactor;
+}
+
+- (void)setContentScaleFactor:(CGFloat)contentScaleFactor {
+    [super setContentScaleFactor:contentScaleFactor];
+    if (_targetScreen == nil) {
+        [self setTargetScreen:self.window.screen];
+    }
     [self invalidateRenderBuffer];
+}
+
+- (void)setTargetScreen:(UIScreen *)targetScreen {
+    _targetScreen = targetScreen;
+    if (targetScreen)
+        [self setContentScaleFactor:_targetScreen.nativeScale];
 }
 
 - (void)layoutSubviews
 {
     [super layoutSubviews];
-    if (self.window.screen != nil) {
-        _scaleFactor = self.window.screen.scale;
+    if (_targetScreen == nil) {
+        [self setTargetScreen:self.window.screen];
     }
     [self invalidateRenderBuffer];
 }
@@ -364,14 +372,12 @@ typedef NS_ENUM(NSInteger, IJKSDLGLViewApplicationState) {
         return;
     }
 
-    [[self eaglLayer] setContentsScale:_scaleFactor];
-
     if (_isRenderBufferInvalidated) {
         NSLog(@"IJKSDLGLView: renderbufferStorage fromDrawable\n");
-        _isRenderBufferInvalidated = NO;
 
+        _isRenderBufferInvalidated = NO;
         glBindRenderbuffer(GL_RENDERBUFFER, _renderbuffer);
-        [_context renderbufferStorage:GL_RENDERBUFFER fromDrawable:(CAEAGLLayer*)self.layer];
+        [_context renderbufferStorage:GL_RENDERBUFFER fromDrawable:_targetLayer];
         glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_WIDTH, &_backingWidth);
         glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_HEIGHT, &_backingHeight);
         IJK_GLES2_Renderer_setGravity(_renderer, _rendererGravity, _backingWidth, _backingHeight);
