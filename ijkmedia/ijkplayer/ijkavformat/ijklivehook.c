@@ -229,7 +229,9 @@ static int ijklivehook_read_header(AVFormatContext *avf, AVDictionary **options)
         }
 
         c->discontinuity = 1;
+        av_dict_set_int(&c->open_opts, "dns_cache_clear", 1, 0);
         ret = open_inner(avf);
+        av_dict_set_int(&c->open_opts, "dns_cache_clear", 0, 0);
     }
 
     return 0;
@@ -270,7 +272,9 @@ static int ijklivehook_read_packet(AVFormatContext *avf, AVPacket *pkt)
         }
 
         c->discontinuity = 1;
+        av_dict_set_int(&c->open_opts, "dns_cache_clear", 1, 0);
         ret = open_inner(avf);
+        av_dict_set_int(&c->open_opts, "dns_cache_clear", 0, 0);
         if (ret)
             continue;
 
