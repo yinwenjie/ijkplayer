@@ -317,7 +317,7 @@ static bool ff_avpacket_is_idr(const AVPacket* pkt, int isAnnexb, bool is_hevc) 
                 void* nal_start = pkt->data+offset;
                 if (is_hevc) {
                     state = ff_get_hevc_nal_units_type(nal_start);
-                    if (state == 19 || state == 20) {
+                    if (state == 19 || state == 20 || state == 21) {
                         return true;
                     }
                 } else {
