@@ -1,6 +1,11 @@
 tag next
 --------------------------------
 
+
+tag k0.8.17
+--------------------------------
+- ios: fix vtb hevc error
+
 tag k0.8.16
 --------------------------------
 - ijkplayer: fix resolution change change issue
